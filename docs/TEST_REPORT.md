@@ -12,16 +12,16 @@ Founder/active/disabled/temporary-password checks from [ADMIN_GUIDE.md](ADMIN_GU
 
 ## Automated results
 
-| Check              | Result | Evidence                                                   |
-| ------------------ | ------ | ---------------------------------------------------------- |
-| Dependency install | Pass   | `npm install` completed with lockfile present              |
-| ESLint             | Pass   | Zero lint errors and zero allowed warnings                 |
-| TypeScript         | Pass   | Project references completed without emit or errors        |
-| Vitest             | Pass   | 18 test files, 82 tests passed                             |
-| Prettier           | Pass   | All checked files match formatting rules                   |
-| Production build   | Pass   | Vite produced `dist/index.html` and static assets          |
-| SPA fallback       | Pass   | Build contains `dist/_redirects` with `/* /index.html 200` |
-| Route HTTP smoke   | Pass   | All 11 application routes returned the SPA shell with 200  |
+| Check              | Result | Evidence                                                                                                                               |
+| ------------------ | ------ | -------------------------------------------------------------------------------------------------------------------------------------- |
+| Dependency install | Pass   | `npm install` completed with lockfile present                                                                                          |
+| ESLint             | Pass   | Zero lint errors and zero allowed warnings                                                                                             |
+| TypeScript         | Pass   | Project references completed without emit or errors                                                                                    |
+| Vitest             | Pass   | 18 test files, 82 tests passed                                                                                                         |
+| Prettier           | Pass   | All checked files match formatting rules                                                                                               |
+| Production build   | Pass   | Vite produced `dist/index.html` and static assets                                                                                      |
+| SPA fallback       | Pass   | Build contains `dist/index.html` and relies on Cloudflare Pages' native SPA fallback; no conflicting catch-all `_redirects` is emitted |
+| Route HTTP smoke   | Pass   | All 11 application routes returned the SPA shell with 200                                                                              |
 
 The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--localstorage-file` warning while starting jsdom. It does not originate in application code, no test fails, and the project pins the supported build runtime to Node 22.16.0. No application warning was suppressed.
 

@@ -215,7 +215,7 @@ CSV export is useful for reporting and portability, but it is not a full backup:
 
 ## Cloudflare Pages readiness
 
-`npm run build` creates `dist`, and `public/_redirects` is copied to `dist/_redirects` so browser refreshes on React Router paths resolve to `index.html`. No deployment, Worker, or Pages Function is included. Later Pages configuration is documented exactly in [CLOUDFLARE_DEPLOYMENT.md](docs/CLOUDFLARE_DEPLOYMENT.md).
+`npm run build` creates `dist`. Cloudflare Pages natively treats a site with `index.html` and no top-level `404.html` as a single-page application, so React Router paths work after a browser refresh without a catch-all `_redirects` rule. No Worker or Pages Function is included. The exact Pages configuration and the distinction between Pages and Workers Static Assets are documented in [CLOUDFLARE_DEPLOYMENT.md](docs/CLOUDFLARE_DEPLOYMENT.md).
 
 ## Documentation
 

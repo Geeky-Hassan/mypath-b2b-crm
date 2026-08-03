@@ -1,6 +1,6 @@
-# Cloudflare Pages Deployment (Later)
+# Cloudflare Pages Deployment
 
-This repository is ready for a later static Cloudflare Pages deployment, but no deployment has been performed. Supabase remains the only backend. No Worker, Pages Function, Wrangler configuration, or Cloudflare database is required.
+This repository is ready for a static Cloudflare Pages deployment. Supabase remains the only backend. No Worker script, Pages Function, Wrangler configuration, or Cloudflare database is required.
 
 ## Prerequisites
 
@@ -11,6 +11,8 @@ This repository is ready for a later static Cloudflare Pages deployment, but no 
 - A clean local acceptance run using Node 22.16.0. Never use the service-role key as a Pages variable.
 
 In Cloudflare, open **Workers & Pages > Create application > Pages > Connect to Git**, select the repository, then enter the configuration below. Create a preview deployment first, complete the manual two-account security checks, and only then attach/promote the production domain.
+
+Do not configure `npx wrangler deploy` as a Pages deploy command. Pages deploys the `dist` directory automatically after the build succeeds. A log line saying `Executing user deploy command: npx wrangler deploy` means the repository was connected to **Workers Builds**, not to a Git-connected **Pages** project.
 
 ## Exact Pages configuration
 
@@ -23,6 +25,7 @@ Create a Git-connected Pages project later with these values:
 | Root directory         | `/` or blank when this app is at repository root   |
 | Build command          | `npm run build`                                    |
 | Build output directory | `dist`                                             |
+| Deploy command         | None; Pages deploys the build output automatically |
 | Build system           | Current Pages build system                         |
 | Node version           | `22.16.0`, pinned by `.node-version`               |
 
@@ -43,15 +46,25 @@ The checked-in `.node-version` pins Node consistently. If the Pages project does
 
 ## SPA refresh routing
 
-`public/_redirects` contains:
+Do not add `/* /index.html 200` to `public/_redirects`. Cloudflare Pages natively treats a deployment with a top-level `index.html` and no top-level `404.html` as a single-page application. Unknown navigation paths are served by the SPA shell, allowing `/dashboard`, `/leads`, and other React Router URLs to load after a browser refresh. See <https://developers.cloudflare.com/pages/configuration/serving-pages/>.
 
-```text
-/* /index.html 200
-```
+The catch-all `_redirects` rule is also incompatible with a Workers Static Assets deployment that already has `assets.not_found_handling = "single-page-application"`; Wrangler rejects that combination as an infinite loop with API error `100324`. This repository intentionally omits that redundant file.
 
-Vite copies this file into `dist`. Cloudflare Pages reads `_redirects` from the static output and rewrites an unknown client-side route to `index.html`, allowing `/dashboard`, `/leads`, and other React Router URLs to load after a browser refresh. See <https://developers.cloudflare.com/pages/configuration/redirects/>.
+Do not add Pages Functions for routing. This SPA does not need them.
 
-Do not add Pages Functions for routing. Cloudflare notes that `_redirects` rules do not apply to routes served by Pages Functions, and this SPA does not need functions.
+## If the project was created under Workers Builds
+
+The application build can succeed and still fail afterward if Cloudflare runs `npx wrangler deploy`. That is a deployment-mode issue, not a Vite failure.
+
+Recommended correction:
+
+1. Create a new **Pages > Connect to Git** project for this repository.
+2. Use `npm run build` and `dist` as shown above.
+3. Leave the deploy command empty.
+4. Add the two `VITE_` variables to both Production and Preview.
+5. Deploy the `main` branch.
+
+If you intentionally keep Workers Static Assets instead, its SPA configuration must use `assets.not_found_handling = "single-page-application"`; do not re-add the catch-all `_redirects` file. Cloudflare documents that Workers configuration at <https://developers.cloudflare.com/workers/static-assets/routing/single-page-application/>.
 
 ## Supabase production settings
 
@@ -78,4 +91,4 @@ npm test
 npm run build
 ```
 
-Confirm `dist/index.html` and `dist/_redirects` exist. After a later deployment, manually verify login, logout, refresh on every client-side route, founder-only URLs, a Hiba delete denial, a stage-history write, and CSV import/export. Do not promote a preview build until those checks pass.
+Confirm `dist/index.html` exists and `dist/_redirects` does not. After deployment, manually verify login, logout, refresh on every client-side route, founder-only URLs, a Hiba delete denial, a stage-history write, and CSV import/export. Do not promote a preview build until those checks pass.
