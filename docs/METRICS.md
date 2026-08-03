@@ -1,0 +1,50 @@
+# Dashboard Metrics and Formulas
+
+All calculations use Supabase records loaded for the signed-in user. The application does not substitute industry benchmarks, estimated dates, inferred costs, or guessed values. “Not enough data” means the required denominator or complete history does not exist.
+
+## Founder metrics
+
+| Metric                        | Calculation                                                                                                                                                                                                     |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Total leads                   | Count of all leads whose lifecycle is not Archived.                                                                                                                                                             |
+| Qualified leads               | Non-archived leads that reached Qualified or any later ordered stage, based on current stage plus recorded history.                                                                                             |
+| Leads contacted               | Leads that reached Contacted or later.                                                                                                                                                                          |
+| Replies                       | Leads that reached Replied or later.                                                                                                                                                                            |
+| Discovery calls               | Leads that reached Discovery Call Completed or later.                                                                                                                                                           |
+| Demos booked                  | Leads that reached Demo Booked or later.                                                                                                                                                                        |
+| Proposals sent                | Leads that reached Paid-Pilot Proposal Sent or later.                                                                                                                                                           |
+| Paid pilots won               | Leads that reached Paid Pilot Won or Recurring Contract Won.                                                                                                                                                    |
+| Recurring contracts won       | Leads that reached Recurring Contract Won.                                                                                                                                                                      |
+| Active pipeline value         | Sum of recorded proposed value for lifecycle Active or Nurture leads. Missing values add zero; no value is invented.                                                                                            |
+| Leads by funnel               | Count by each lead’s current detailed stage mapped to its macro funnel.                                                                                                                                         |
+| Leads by source               | Count grouped by recorded source.                                                                                                                                                                               |
+| Leads by segment              | Count grouped by customer segment; blank values appear as Not recorded.                                                                                                                                         |
+| Leads by country              | Count grouped by country; blank values appear as Not recorded.                                                                                                                                                  |
+| Stage-to-stage conversion     | Among leads with a recorded entry into stage A, the percentage with a later recorded entry into immediately following stage B. A real denominator with no conversions is 0%; no denominator is Not enough data. |
+| Lead-to-paid-pilot conversion | Leads that reached Paid Pilot Won or later ÷ all non-archived leads × 100.                                                                                                                                      |
+| Average sales-cycle length    | Mean elapsed days from recorded Lead Added to first recorded Paid Pilot Won or Recurring Contract Won. Leads missing either event are excluded.                                                                 |
+| Average time in stage         | Mean elapsed days between a stage-history event and the next event. For the current stage of an Active/Nurture lead, the interval ends now. Incomplete terminal intervals are excluded.                         |
+| Lost reasons                  | Lost lifecycle leads grouped by the exact manually entered reason. Blank legacy reasons display Not recorded.                                                                                                   |
+| Drop-off stage                | Lost lifecycle leads grouped by the detailed stage retained when they were marked Lost.                                                                                                                         |
+| Overdue next actions          | Active/Nurture leads with `next_action_date` before today.                                                                                                                                                      |
+| Replies with no next action   | Active/Nurture leads that reached Replied and have neither next-action text nor date.                                                                                                                           |
+| Demos requiring follow-up     | Active/Nurture leads that reached Demo Completed and have no future next-action date.                                                                                                                           |
+| Stale seven days              | Active/Nurture leads whose latest activity is more than seven days old. If no activity exists, creation time is used.                                                                                           |
+| CAC                           | Current-month founder-entered sales cost ÷ leads first moved to Paid Pilot Won or Recurring Contract Won in that month. Missing cost or zero wins displays Not enough data.                                     |
+
+## Lead Generator metrics
+
+| Metric                          | Calculation                                                                                                                                                                                       |
+| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Weekly lead target              | The signed-in user’s Leads Added weekly target covering the current Monday-to-Sunday period.                                                                                                      |
+| Leads added this week           | Leads created by the signed-in user during that period.                                                                                                                                           |
+| Qualified leads added           | Leads created by the user this week that reached Qualified or later.                                                                                                                              |
+| Target completion               | Leads added this week ÷ weekly Leads Added target × 100. Missing/zero target displays Not enough data.                                                                                            |
+| Leads missing information       | User-created, non-archived leads missing at least one Lead Generator-editable research field: website, contact name, contact email, country, or segment. This is a warning, not a pipeline block. |
+| Leads by country/segment/source | User-created, non-archived leads grouped by each recorded field.                                                                                                                                  |
+| Rejected or unqualified         | User-created Lost leads whose manually entered lost reason contains “rejected” or “unqualified.” No qualification-score cutoff is assumed.                                                        |
+| Recent activity                 | Latest dated activity rows created by the user across leads the user created.                                                                                                                     |
+
+## Target actuals
+
+Leads Added uses lead `created_by` and `created_at`. Every other supported target counts distinct leads with the matching `stage_history.new_stage`, `changed_by = target.user_id`, and `changed_at` inside the inclusive target date range. Target completion is actual ÷ target value × 100.
