@@ -16,11 +16,20 @@ describe('team-admin Edge Function contract', () => {
     expect(edgeFunction).toContain("target.role !== 'lead_generator'")
   })
 
-  it('creates confirmed Lead Generator accounts that require password onboarding', () => {
+  it('creates confirmed Lead Generator accounts with immediately usable passwords', () => {
     expect(edgeFunction).toContain('email_confirm: true')
     expect(edgeFunction).toContain("role: 'lead_generator'")
-    expect(edgeFunction).toContain('must_change_password: true')
-    expect(edgeFunction).toContain("body.action === 'change_own_password'")
+    expect(edgeFunction).toContain('must_change_password: false')
+    expect(edgeFunction).not.toContain('must_change_password: true')
+  })
+
+  it('confirms email on password reset and reactivation', () => {
+    expect(edgeFunction).toMatch(
+      /body\.action === 'reset_password'[\s\S]*password: body\.password,[\s\S]*email_confirm: true/,
+    )
+    expect(edgeFunction).toMatch(
+      /body\.action === 'set_account_status'[\s\S]*ban_duration:[\s\S]*email_confirm: true/,
+    )
   })
 
   it('never puts the service role secret in frontend source', () => {
@@ -31,6 +40,6 @@ describe('team-admin Edge Function contract', () => {
   it('returns sanitized password errors and never logs request bodies', () => {
     expect(edgeFunction).not.toContain('console.log')
     expect(edgeFunction).not.toMatch(/json\([^\n]+password: body\.password/)
-    expect(edgeFunction).toContain('The temporary password could not be set.')
+    expect(edgeFunction).toContain('The new login password could not be set.')
   })
 })

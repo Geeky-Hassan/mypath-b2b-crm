@@ -92,13 +92,6 @@ Deno.serve(async (request) => {
   if (body.action === 'change_own_password') {
     const issue = passwordIssue(body.password)
     if (issue) return json(400, { error: issue })
-    if (fullName.length > 120) return json(400, { error: 'Full name is too long.' })
-    if ((body.job_title?.length ?? 0) > 120) {
-      return json(400, { error: 'Job title is too long.' })
-    }
-    if ((body.responsibilities?.length ?? 0) > 3000) {
-      return json(400, { error: 'Responsibilities are too long.' })
-    }
 
     const { error: passwordError } = await admin.auth.admin.updateUserById(user.id, {
       password: body.password,
@@ -154,7 +147,7 @@ Deno.serve(async (request) => {
         job_title: clean(body.job_title),
         responsibilities: clean(body.responsibilities),
         account_status: 'active',
-        must_change_password: true,
+        must_change_password: false,
       })
       .eq('id', created.user.id)
     if (profileError) {
@@ -194,19 +187,20 @@ Deno.serve(async (request) => {
 
     const { error: flagError } = await admin
       .from('profiles')
-      .update({ must_change_password: true })
+      .update({ must_change_password: false })
       .eq('id', target.id)
     if (flagError) return json(500, { error: 'Password reset could not be prepared.' })
 
     const { error: resetError } = await admin.auth.admin.updateUserById(target.id, {
       password: body.password,
+      email_confirm: true,
     })
     if (resetError) {
       await admin
         .from('profiles')
         .update({ must_change_password: target.must_change_password })
         .eq('id', target.id)
-      return json(400, { error: 'The temporary password could not be set.' })
+      return json(400, { error: 'The new login password could not be set.' })
     }
     return json(200, { ok: true })
   }
@@ -216,6 +210,7 @@ Deno.serve(async (request) => {
     const disabled = body.account_status === 'disabled'
     const { error: authUpdateError } = await admin.auth.admin.updateUserById(target.id, {
       ban_duration: disabled ? '876000h' : 'none',
+      ...(disabled ? {} : { email_confirm: true }),
     })
     if (authUpdateError) {
       return json(400, { error: 'The authentication account could not be updated.' })

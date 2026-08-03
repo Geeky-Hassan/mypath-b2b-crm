@@ -16,22 +16,26 @@ Apply every migration in filename order through the Supabase SQL Editor or CLI:
 6. `202608030006_reconcile_pipeline_stage_values.sql`
 7. `202608030007_stage_context_and_follow_up.sql`
 8. `202608030008_team_operations.sql`
+9. `202608040009_direct_login_account_access.sql`
 
 Then deploy the authenticated Edge Function:
 
 ```bash
-supabase link --project-ref YOUR_PROJECT_REF
-supabase functions deploy team-admin
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy team-admin
 ```
 
 Keep JWT verification enabled. Hosted Supabase supplies the function's server
 secrets. Never add `SUPABASE_SERVICE_ROLE_KEY` to Vite or Cloudflare Pages.
+The CLI is pinned as an npm development dependency, so Windows users should run
+it through `npx`; a global `supabase` command is not expected.
 
 Do not rerun individual forward migrations against a partially migrated production database. Test the full sequence in a separate Supabase project before applying it to a database that contains live data.
 
 ## Optional sample data
 
-After creating both profiles and assigning Noor the Founder role, run the full
+After assigning Noor the Founder role, run the full
 `supabase/seed.sql` file in the SQL Editor to add two demonstration leads. The
 records include activities and contextual stage history so dashboards, journey
 analytics, filters, and the pipeline can be reviewed immediately. The script is
@@ -43,29 +47,46 @@ exists, it stops without inserting anything. The contacts use `.example`
 domains. Keep the seed out of production unless demo data is intentionally
 required.
 
-## Create Noor and Hiba
+## Create the Founder and Lead Generators
 
-1. In **Authentication > Users**, create both users manually with their real email addresses and strong passwords.
-2. Auto-confirm the users so V1 does not need confirmation email delivery.
+1. In **Authentication > Users**, create only the initial Founder manually with a real email address and strong password.
+2. Auto-confirm the Founder so V1 does not need confirmation email delivery.
 3. Disable public signup in Auth settings.
-4. Run the following after replacing the email addresses:
+4. Run the following after replacing the Founder email:
 
 ```sql
 update public.profiles
 set full_name = 'Noor Ul Hassan', role = 'founder'
 where id = (select id from auth.users where email = 'noor@your-domain.com');
-
-update public.profiles
-set full_name = 'Hiba', role = 'lead_generator'
-where id = (select id from auth.users where email = 'hiba@your-domain.com');
 ```
 
 New Auth users default to `lead_generator`. The profile update trigger prevents a browser session from changing its email, role, ID, or creation time.
 
-After the first Founder is configured, create later Lead Generators from
-**Settings > Users & access**. The Founder may reset temporary passwords,
-disable/reactivate access, and edit work descriptions. Accounts are never
-deleted. Additional Founder accounts remain a manual Supabase operation.
+After the first Founder is configured, create Lead Generators from **Settings >
+Users & access**. The Founder may create or reset an immediately usable login
+password, disable/reactivate access, and edit work descriptions. Accounts with
+CRM audit ownership are disabled rather than deleted. Additional Founder
+accounts remain a manual Supabase operation.
+
+### Replacing an old test account
+
+Named Lead Generator accounts are not created by migrations or seed data. If an
+old test Auth user already exists, its record lives in Supabase rather than this
+repository:
+
+1. Disable it from **Settings > Users & access** so RLS blocks its existing
+   sessions immediately.
+2. If it has no leads, activities, stage history, targets, tasks, or other audit
+   references, delete it from **Supabase > Authentication > Users**.
+3. If Supabase refuses deletion because CRM records reference the profile, keep
+   it disabled to preserve history. Either reuse it with **Reset password** then
+   **Reactivate**, or remove the associated demonstration records through the
+   CRM before deleting the unused Auth user.
+4. Add the replacement from **Settings > Users & access**. Copy the credentials
+   shown after creation and send them securely; the user can sign in directly.
+
+Never delete or rewrite a profile that owns real audit history merely to reuse
+an email address.
 
 ## Effective access matrix
 
@@ -80,29 +101,29 @@ deleted. Additional Founder accounts remain a manual Supabase operation.
 | CRM settings  | No access | Read                                                              | Read and update                            |
 | Tasks         | No access | Read assigned; update status/note                                 | Create, assign, edit, cancel, delete       |
 | Task events   | No access | Read events for assigned tasks                                    | Read all; trigger-owned writes             |
-| Account admin | No access | Change own temporary password                                     | Manage Lead Generator Auth accounts        |
+| Account admin | No access | No access                                                         | Manage Lead Generator Auth accounts        |
 
 RLS is enabled on every exposed V1 table. Policies target `authenticated` and
-require `private.can_use_crm()`: Active account plus no pending password change.
+require `private.can_use_crm()`: an Active authorised account.
 The role-aware lead view and database triggers retain the financial, lifecycle,
 archive, transition, and delete boundaries. Direct stage and task-event writes
 are revoked; database triggers own those records.
 
 ## Manual security checks after migration
 
-Use Noor and Hiba test sessions through the browser or Supabase JavaScript client. The SQL Editor normally runs with elevated privileges and is not a valid RLS test.
+Use Founder and Lead Generator test sessions through the browser or Supabase JavaScript client. The SQL Editor normally runs with elevated privileges and is not a valid RLS test.
 
 - Without a session, selects and mutations for every CRM table must fail or return no rows.
-- Hiba can read shared non-financial lead data and update company/contact/qualification fields.
-- Hiba can move Lead Added to Qualified, but later stage, lifecycle, follow-up, proposed-value, archive, and delete requests must fail or affect zero rows.
-- Hiba can read only her target rows and cannot insert, update, or delete targets.
-- Hiba cannot read `sales_costs` or update `crm_settings`.
+- A Lead Generator can read shared non-financial lead data and update company/contact/qualification fields.
+- A Lead Generator can move Lead Added to Qualified, but later stage, lifecycle, follow-up, proposed-value, archive, and delete requests must fail or affect zero rows.
+- A Lead Generator can read only personal target rows and cannot insert, update, or delete targets.
+- A Lead Generator cannot read `sales_costs` or update `crm_settings`.
 - Noor can start the delete flow from any lead. The UI requires archive first,
   then an exact company-name confirmation; the database still rejects deletion
   unless the row is archived.
 - Neither browser session can insert, update, or delete `stage_history` directly.
-- A disabled user and a user awaiting password change cannot select CRM data.
-- Hiba sees only assigned tasks and cannot create, reassign, cancel, delete, or
+- A disabled user cannot select CRM data, even with an older session.
+- A Lead Generator sees only assigned tasks and cannot create, reassign, cancel, delete, or
   edit protected task details through direct Supabase requests.
 - Only a Founder can create/reset/disable/reactivate Lead Generator accounts
   through `team-admin`; a Lead Generator receives HTTP 403 for admin actions.

@@ -446,10 +446,9 @@ grant execute on function private.is_founder() to authenticated;
 revoke all on function public.advance_lead_to_qualified(uuid) from public, anon;
 grant execute on function public.advance_lead_to_qualified(uuid) to authenticated;
 
--- After creating Noor and Hiba in Authentication > Users, set their profiles:
+-- After creating the Founder in Authentication > Users, set the Founder profile.
 -- update public.profiles set display_name = 'Noor Ul Hassan', role = 'founder'
 -- where id = (select id from auth.users where email = 'noor@example.com');
--- update public.profiles set display_name = 'Hiba', role = 'lead_generator'
--- where id = (select id from auth.users where email = 'hiba@example.com');
+-- Create Lead Generators later through Settings > Users & access.
 
 commit;

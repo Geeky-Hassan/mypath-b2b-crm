@@ -2,7 +2,7 @@
 
 ## Purpose
 
-MyPath CRM is a focused internal workspace for founder Noor Ul Hassan and lead generator Hiba. It combines prospect research, one primary contact, qualification, activity history, an operational sales funnel, proposed value, and weekly or monthly targets.
+MyPath CRM is a focused internal workspace for founder Noor Ul Hassan and authorised Lead Generators. It combines prospect research, one primary contact, qualification, activity history, an operational sales funnel, proposed value, and weekly or monthly targets.
 
 ## Users and permissions
 
@@ -75,8 +75,9 @@ to research and qualification fields and forced to Active at Lead Added; only th
 Founder can export. CSV remains the only spreadsheet exchange.
 
 The Founder creates, resets, disables, and reactivates Lead Generator accounts
-through a secured Supabase Edge Function. New/reset accounts must change the
-temporary password before CRM access. Users are disabled rather than deleted.
+through a secured Supabase Edge Function. Founder-set passwords are immediately
+usable and account creation/reset confirms the email server-side. Users are
+disabled rather than deleted when audit ownership must be preserved.
 
 ## Out of scope
 

@@ -19,7 +19,10 @@ export function friendlyAuthError(caught: unknown): string {
     return 'The email or password is incorrect.'
   }
   if (message.includes('email not confirmed')) {
-    return 'This account is not active yet. Ask the CRM administrator for help.'
+    return 'This email is not confirmed. Ask the Founder to reset the login password or reactivate access.'
+  }
+  if (message.includes('banned') || message.includes('disabled')) {
+    return 'The Founder has disabled this account. Ask the Founder to reactivate access.'
   }
   if (message.includes('too many requests') || message.includes('rate limit')) {
     return 'Too many sign-in attempts. Wait a moment and try again.'

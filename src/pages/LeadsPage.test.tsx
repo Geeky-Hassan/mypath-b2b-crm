@@ -24,8 +24,8 @@ vi.mock('../services/crm', async (importOriginal) => {
 const userId = '11111111-1111-4111-8111-111111111111'
 const profile: Profile = {
   id: userId,
-  full_name: 'Hiba',
-  email: 'hiba@example.com',
+  full_name: 'Sample Lead Generator',
+  email: 'lead-generator@example.com',
   role: 'lead_generator',
   job_title: 'Lead Generator',
   responsibilities: null,

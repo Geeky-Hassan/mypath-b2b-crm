@@ -41,6 +41,13 @@ const teamOperations = readFileSync(
   new URL('../../supabase/migrations/202608030008_team_operations.sql', import.meta.url),
   'utf8',
 )
+const directLoginAccess = readFileSync(
+  new URL(
+    '../../supabase/migrations/202608040009_direct_login_account_access.sql',
+    import.meta.url,
+  ),
+  'utf8',
+)
 const sampleSeed = readFileSync(
   new URL('../../supabase/seed.sql', import.meta.url),
   'utf8',
@@ -158,9 +165,12 @@ describe('RLS migration contract', () => {
     expect(sampleSeed.trim().endsWith('commit;')).toBe(true)
   })
 
-  it('blocks disabled and temporary-password accounts at every CRM policy boundary', () => {
+  it('blocks disabled accounts while allowing Founder-issued direct login', () => {
     expect(teamOperations).toContain('create or replace function private.can_use_crm()')
-    expect(teamOperations).toMatch(
+    expect(directLoginAccess).toContain('update public.profiles')
+    expect(directLoginAccess).toContain('set must_change_password = false')
+    expect(directLoginAccess).toMatch(/account_status = 'active'/)
+    expect(directLoginAccess).not.toMatch(
       /account_status = 'active'[\s\S]*not must_change_password/,
     )
     expect(teamOperations).toContain('drop policy if exists leads_read_authenticated')

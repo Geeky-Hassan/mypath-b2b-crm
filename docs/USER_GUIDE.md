@@ -43,7 +43,7 @@ Duplicate warnings compare normalized company websites and contact email address
 - Founder-only **Archive** removes a lead from normal active views without deleting its history. Restore reverses this action.
 - The founder can choose **Delete** on any lead. The dialog first archives an
   active lead, then requires the exact company name before permanent deletion.
-  Hiba never sees this action.
+  Lead Generators never see this action.
 - Activity deletion is permanent and asks for confirmation. Add corrections as a new activity when preserving history matters.
 
 ## Pipeline and keyboard use

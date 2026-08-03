@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { generateTemporaryPassword, temporaryPasswordSchema } from './accountValidation'
 
-describe('temporary password policy', () => {
+describe('secure login password policy', () => {
   it('requires length and mixed character classes', () => {
     expect(temporaryPasswordSchema.safeParse('short').success).toBe(false)
     expect(temporaryPasswordSchema.safeParse('A-secure-passphrase1').success).toBe(true)

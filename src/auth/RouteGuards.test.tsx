@@ -54,7 +54,7 @@ describe('route authorization', () => {
   })
 
   it('blocks founder routes for a lead generator', () => {
-    authState.user = { id: 'hiba' }
+    authState.user = { id: 'lead-generator' }
     authState.profile = { role: 'lead_generator' }
     render(
       <MemoryRouter initialEntries={['/settings']}>
@@ -89,8 +89,8 @@ describe('route authorization', () => {
     expect(screen.getByText('Founder settings')).toBeTruthy()
   })
 
-  it('blocks normal CRM routes until a temporary password is changed', () => {
-    authState.user = { id: 'hiba' }
+  it('allows an active user to use the Founder-issued password directly', () => {
+    authState.user = { id: 'lead-generator' }
     authState.profile = { role: 'lead_generator', must_change_password: true }
     render(
       <MemoryRouter initialEntries={['/dashboard']}>
@@ -107,6 +107,6 @@ describe('route authorization', () => {
         </Routes>
       </MemoryRouter>,
     )
-    expect(screen.getByText('Change password')).toBeTruthy()
+    expect(screen.getByText('Private dashboard')).toBeTruthy()
   })
 })

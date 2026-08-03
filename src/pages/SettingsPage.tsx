@@ -59,6 +59,12 @@ export default function SettingsPage() {
   const [editProfile, setEditProfile] = useState<Profile | null>(null)
   const [resetProfile, setResetProfile] = useState<Profile | null>(null)
   const [temporaryPassword, setTemporaryPassword] = useState('')
+  const [createdCredentials, setCreatedCredentials] = useState<{
+    fullName: string
+    email: string
+    password: string
+  } | null>(null)
+  const [passwordResetComplete, setPasswordResetComplete] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [accountBusy, setAccountBusy] = useState<string | null>(null)
   const { data, loading, error, refresh } = useAsyncData(async () => {
@@ -140,11 +146,14 @@ export default function SettingsPage() {
           busy={accountBusy}
           onCreate={() => {
             setActionError(null)
+            setCreatedCredentials(null)
             setCreateOpen(true)
           }}
           onEdit={setEditProfile}
           onReset={(profile) => {
             setTemporaryPassword(generateTemporaryPassword())
+            setPasswordResetComplete(false)
+            setActionError(null)
             setResetProfile(profile)
           }}
           onStatus={(profile) => void runStatusChange(profile)}
@@ -153,34 +162,53 @@ export default function SettingsPage() {
 
       <Modal
         open={createOpen}
-        onClose={() => setCreateOpen(false)}
+        onClose={() => {
+          setCreateOpen(false)
+          setCreatedCredentials(null)
+        }}
         title="Create Lead Generator"
-        description="The account is confirmed immediately and must change its temporary password before CRM access."
+        description="The account is confirmed immediately and can sign in with the password you provide."
         size="lg"
       >
-        <AccountForm
-          onCancel={() => setCreateOpen(false)}
-          onCreated={async (values) => {
-            setActionError(null)
-            try {
-              await runTeamAdminAction({ action: 'create_lead_generator', ...values })
-              toast({
-                title: 'Lead Generator account created.',
-                description: 'Share the temporary password securely.',
-                tone: 'success',
-              })
+        {createdCredentials ? (
+          <CredentialsPanel
+            title={`${createdCredentials.fullName} can sign in now.`}
+            email={createdCredentials.email}
+            password={createdCredentials.password}
+            onDone={() => {
               setCreateOpen(false)
-              await refresh()
-            } catch (caught) {
-              setActionError(
-                caught instanceof Error
-                  ? caught.message
-                  : 'The account could not be created.',
-              )
-              throw caught
-            }
-          }}
-        />
+              setCreatedCredentials(null)
+            }}
+          />
+        ) : (
+          <AccountForm
+            onCancel={() => setCreateOpen(false)}
+            onCreated={async (values) => {
+              setActionError(null)
+              try {
+                await runTeamAdminAction({ action: 'create_lead_generator', ...values })
+                setCreatedCredentials({
+                  fullName: values.full_name,
+                  email: values.email,
+                  password: values.password,
+                })
+                toast({
+                  title: 'Lead Generator account created.',
+                  description: 'The account can sign in with these credentials now.',
+                  tone: 'success',
+                })
+                await refresh()
+              } catch (caught) {
+                setActionError(
+                  caught instanceof Error
+                    ? caught.message
+                    : 'The account could not be created.',
+                )
+                throw caught
+              }
+            }}
+          />
+        )}
       </Modal>
       <Modal
         open={Boolean(editProfile)}
@@ -203,70 +231,88 @@ export default function SettingsPage() {
       </Modal>
       <Modal
         open={Boolean(resetProfile)}
-        onClose={() => setResetProfile(null)}
-        title="Reset temporary password"
-        description="This immediately replaces the old password and blocks normal CRM access until changed."
+        onClose={() => {
+          setResetProfile(null)
+          setPasswordResetComplete(false)
+        }}
+        title="Reset login password"
+        description="This immediately replaces the old password. No additional password change is required."
         size="md"
       >
         {resetProfile ? (
-          <div className="space-y-4">
-            {actionError ? <Alert tone="error">{actionError}</Alert> : null}
-            <Alert tone="warning">
-              Share this password with {resetProfile.full_name} through a secure channel.
-              It is not stored in the CRM.
-            </Alert>
-            <Field label="New temporary password">
-              <Input
-                value={temporaryPassword}
-                onChange={(event) => setTemporaryPassword(event.target.value)}
-              />
-            </Field>
-            {!temporaryPasswordSchema.safeParse(temporaryPassword).success ? (
-              <p className="text-xs text-red-600">
-                Use at least 12 characters with upper/lowercase letters, a number, and a
-                symbol.
-              </p>
-            ) : null}
-            <div className="flex flex-wrap justify-end gap-2">
-              <Button
-                variant="ghost"
-                onClick={() => void navigator.clipboard.writeText(temporaryPassword)}
-              >
-                Copy password
-              </Button>
-              <Button
-                variant="secondary"
-                onClick={() => setTemporaryPassword(generateTemporaryPassword())}
-              >
-                Generate another
-              </Button>
-              <Button
-                disabled={!temporaryPasswordSchema.safeParse(temporaryPassword).success}
-                onClick={async () => {
-                  setAccountBusy(resetProfile.id)
-                  setActionError(null)
-                  try {
-                    await runTeamAdminAction({
-                      action: 'reset_password',
-                      user_id: resetProfile.id,
-                      password: temporaryPassword,
-                    })
-                    toast({ title: 'Temporary password reset.', tone: 'success' })
-                    setResetProfile(null)
-                    await refresh()
-                  } catch (caught) {
-                    setActionError(
-                      caught instanceof Error ? caught.message : 'Password reset failed.',
-                    )
-                  } finally {
-                    setAccountBusy(null)
-                  }
-                }}
-              >
-                Reset password
-              </Button>
+          passwordResetComplete ? (
+            <CredentialsPanel
+              title={`${resetProfile.full_name}'s password is ready.`}
+              email={resetProfile.email}
+              password={temporaryPassword}
+              onDone={() => {
+                setResetProfile(null)
+                setPasswordResetComplete(false)
+              }}
+            />
+          ) : (
+            <div className="space-y-4">
+              {actionError ? <Alert tone="error">{actionError}</Alert> : null}
+              <Alert tone="warning">
+                Share this password with {resetProfile.full_name} through a secure
+                channel. It is not stored in the CRM. If this account is disabled,
+                reactivate it separately after resetting the password.
+              </Alert>
+              <Field label="New login password">
+                <Input
+                  value={temporaryPassword}
+                  onChange={(event) => setTemporaryPassword(event.target.value)}
+                />
+              </Field>
+              {!temporaryPasswordSchema.safeParse(temporaryPassword).success ? (
+                <p className="text-xs text-red-600">
+                  Use at least 12 characters with upper/lowercase letters, a number, and a
+                  symbol.
+                </p>
+              ) : null}
+              <div className="flex flex-wrap justify-end gap-2">
+                <Button
+                  variant="ghost"
+                  onClick={() => void navigator.clipboard.writeText(temporaryPassword)}
+                >
+                  Copy password
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setTemporaryPassword(generateTemporaryPassword())}
+                >
+                  Generate another
+                </Button>
+                <Button
+                  disabled={!temporaryPasswordSchema.safeParse(temporaryPassword).success}
+                  onClick={async () => {
+                    setAccountBusy(resetProfile.id)
+                    setActionError(null)
+                    try {
+                      await runTeamAdminAction({
+                        action: 'reset_password',
+                        user_id: resetProfile.id,
+                        password: temporaryPassword,
+                      })
+                      toast({ title: 'Login password reset.', tone: 'success' })
+                      setPasswordResetComplete(true)
+                      await refresh()
+                    } catch (caught) {
+                      setActionError(
+                        caught instanceof Error
+                          ? caught.message
+                          : 'Password reset failed.',
+                      )
+                    } finally {
+                      setAccountBusy(null)
+                    }
+                  }}
+                >
+                  Set new password
+                </Button>
+              </div>
             </div>
-          </div>
+          )
         ) : null}
       </Modal>
     </div>
@@ -407,9 +453,6 @@ function UsersAccess({
                     <Badge tone={profile.account_status === 'active' ? 'green' : 'red'}>
                       {profile.account_status}
                     </Badge>
-                    {profile.must_change_password ? (
-                      <Badge tone="amber">Password change required</Badge>
-                    ) : null}
                   </div>
                 </td>
                 <td className="px-4 py-3 text-xs text-slate-500">
@@ -517,7 +560,7 @@ function AccountForm({
           <Input type="email" autoComplete="off" {...register('email')} />
         </Field>
       </div>
-      <Field label="Temporary password" required error={errors.password?.message}>
+      <Field label="Login password" required error={errors.password?.message}>
         <div className="flex gap-2">
           <Input
             type="text"
@@ -551,6 +594,55 @@ function AccountForm({
         </Button>
       </div>
     </form>
+  )
+}
+
+function CredentialsPanel({
+  title,
+  email,
+  password,
+  onDone,
+}: {
+  title: string
+  email: string
+  password: string
+  onDone: () => void
+}) {
+  const { toast } = useToast()
+  const credentials = `MyPath CRM\nLogin: ${window.location.origin}/login\nEmail: ${email}\nPassword: ${password}`
+  return (
+    <div className="space-y-4">
+      <Alert tone="success" title={title}>
+        Copy these credentials now and share them through a secure channel. The password
+        cannot be retrieved after this window closes.
+      </Alert>
+      <Field label="Email">
+        <Input readOnly value={email} />
+      </Field>
+      <Field label="Password">
+        <Input readOnly value={password} />
+      </Field>
+      <div className="flex flex-wrap justify-end gap-2">
+        <Button
+          variant="secondary"
+          onClick={async () => {
+            try {
+              await navigator.clipboard.writeText(credentials)
+              toast({ title: 'Login credentials copied.', tone: 'success' })
+            } catch {
+              toast({
+                title: 'Credentials could not be copied.',
+                description: 'Copy the email and password fields manually.',
+                tone: 'error',
+              })
+            }
+          }}
+        >
+          Copy credentials
+        </Button>
+        <Button onClick={onDone}>Done</Button>
+      </div>
+    </div>
   )
 }
 

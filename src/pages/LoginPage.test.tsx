@@ -45,12 +45,15 @@ describe('login form', () => {
       </MemoryRouter>,
     )
 
-    await user.type(screen.getByLabelText(/^Email/), 'hiba@example.com')
+    await user.type(screen.getByLabelText(/^Email/), 'lead-generator@example.com')
     await user.type(screen.getByLabelText(/^Password/), 'secret-password')
     await user.click(screen.getByRole('button', { name: 'Sign in' }))
 
     await waitFor(() => {
-      expect(authState.signIn).toHaveBeenCalledWith('hiba@example.com', 'secret-password')
+      expect(authState.signIn).toHaveBeenCalledWith(
+        'lead-generator@example.com',
+        'secret-password',
+      )
     })
     expect(await screen.findByText('The email or password is incorrect.')).toBeTruthy()
   })
@@ -58,6 +61,15 @@ describe('login form', () => {
   it('does not expose unknown backend authentication details', () => {
     expect(friendlyAuthError(new Error('internal auth stack details'))).toBe(
       'Sign-in could not be completed. Check your details or contact the CRM administrator.',
+    )
+  })
+
+  it('clearly distinguishes disabled and unconfirmed accounts', () => {
+    expect(friendlyAuthError(new Error('User is banned'))).toBe(
+      'The Founder has disabled this account. Ask the Founder to reactivate access.',
+    )
+    expect(friendlyAuthError(new Error('Email not confirmed'))).toBe(
+      'This email is not confirmed. Ask the Founder to reset the login password or reactivate access.',
     )
   })
 })

@@ -1,6 +1,6 @@
 # MyPath B2B CRM
 
-An internal, desktop-first CRM for MyPath. Noor Ul Hassan and Hiba share lead, contact, qualification, activity, and pipeline data, with Supabase Row Level Security enforcing authenticated access and founder-only permanent deletion.
+An internal, desktop-first CRM for MyPath. The Founder and authorised Lead Generators share lead, contact, qualification, activity, and pipeline data, with Supabase Row Level Security enforcing authenticated access and founder-only permanent deletion.
 
 ## Stack
 
@@ -16,7 +16,7 @@ An internal, desktop-first CRM for MyPath. Noor Ul Hassan and Hiba share lead, c
 
 ## Local setup
 
-Requirements: Node.js 22.16 or newer, npm, and a Supabase project. The checked-in `.node-version` pins the release build version.
+Requirements: Node.js 22.16 or newer, npm, and a Supabase project. The checked-in `.node-version` pins the release build version. `npm install` also installs the project-scoped Supabase CLI.
 
 ```bash
 npm install
@@ -43,11 +43,11 @@ Never place a service-role key in this application or commit a real `.env` file.
 
 After Supabase setup, run `npm run dev`, open the printed `http://localhost:5173` URL, and test with both accounts:
 
-1. Sign in as Hiba, review **My focus**, add a lead with an optional international phone, bulk-import a small CSV, complete an assigned task, and move Lead Added to Qualified. Confirm deal values, export, archive/delete, Team, and Settings are unavailable.
+1. Sign in as a Lead Generator created from **Settings > Users & access**, review **My focus**, add a lead with an optional international phone, bulk-import a small CSV, complete an assigned task, and move Lead Added to Qualified. Confirm deal values, export, archive/delete, Team, and Settings are unavailable.
 2. Sign in as Noor, add contact activity and a next action, move the lead through later stages, enter a proposed value for proposal/negotiation, mark a test lead lost with a reason, and archive/restore/delete an archived test lead.
-3. Create one weekly and one monthly target; confirm Hiba sees only her targets and Noor sees both users.
+3. Create one weekly and one monthly target; confirm the Lead Generator sees only personal targets and Noor sees both users.
 4. Import a small template CSV, review mapping/invalid/duplicate states, export the filtered Leads view, and open the CSV in a spreadsheet.
-5. Create a temporary Lead Generator in **Settings > Users & access**, verify forced password change, disable/reactivate access, and refresh every application route.
+5. Create a Lead Generator in **Settings > Users & access**, copy the generated credentials, verify direct login, then disable/reactivate access and refresh every application route.
 
 Run the complete automated gate before accepting a change:
 
@@ -74,13 +74,14 @@ Apply the migrations in filename order using the Supabase SQL Editor or CLI:
 6. `supabase/migrations/202608030006_reconcile_pipeline_stage_values.sql`
 7. `supabase/migrations/202608030007_stage_context_and_follow_up.sql`
 8. `supabase/migrations/202608030008_team_operations.sql`
+9. `supabase/migrations/202608040009_direct_login_account_access.sql`
 
-Deploy the authenticated account-administration function after migration 8:
+Deploy the authenticated account-administration function after migration 9:
 
 ```bash
-supabase login
-supabase link --project-ref YOUR_PROJECT_REF
-supabase functions deploy team-admin
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy team-admin
 ```
 
 Hosted Supabase supplies the function's server secrets. Never copy the
@@ -89,17 +90,13 @@ service-role key into Vite or Cloudflare. Keep JWT verification enabled.
 Then:
 
 1. Keep email/password authentication enabled and disable public signup.
-2. Create Noor and Hiba manually in Authentication → Users, with passwords and auto-confirm enabled so no confirmation email is needed.
-3. Assign their names and roles after replacing the example emails:
+2. Create only the initial Founder manually in Authentication → Users, with a strong password and auto-confirm enabled.
+3. Assign the Founder name and role after replacing the example email:
 
 ```sql
 update public.profiles
 set full_name = 'Noor Ul Hassan', role = 'founder'
 where id = (select id from auth.users where email = 'noor@your-domain.com');
-
-update public.profiles
-set full_name = 'Hiba', role = 'lead_generator'
-where id = (select id from auth.users where email = 'hiba@your-domain.com');
 ```
 
 If the Auth users existed before the migrations, upsert their profiles:
@@ -110,17 +107,21 @@ select id, 'Noor Ul Hassan', email, 'founder'::public.user_role
 from auth.users where email = 'noor@your-domain.com'
 on conflict (id) do update
 set full_name = excluded.full_name, email = excluded.email, role = excluded.role;
-
-insert into public.profiles (id, full_name, email, role)
-select id, 'Hiba', email, 'lead_generator'::public.user_role
-from auth.users where email = 'hiba@your-domain.com'
-on conflict (id) do update
-set full_name = excluded.full_name, email = excluded.email, role = excluded.role;
 ```
+
+After the Founder can sign in, create every Lead Generator from **Settings >
+Users & access**. The Founder supplies the name, email, work details, and login
+password. The account is email-confirmed server-side and can sign in immediately
+with those credentials; no user-side password change is required.
+
+Existing test Auth users are not stored in this repository. Remove an unused
+one from **Supabase > Authentication > Users** before recreating the same email,
+or reset and reactivate it if CRM history already references that profile. See
+[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md#replacing-an-old-test-account).
 
 ### Optional sample leads
 
-After both profiles exist and Noor has the `founder` role, run the complete
+After the Founder profile exists, run the complete
 [`supabase/seed.sql`](supabase/seed.sql) file in the Supabase SQL Editor. It adds
 two realistic leads at different journey stages, including activities, dated
 stage history, descriptions, values, and upcoming follow-ups. The seed uses the
@@ -138,6 +139,25 @@ The seed is transactional, so a failed attempt leaves no partial sample batch.
 No SMTP, email templates, Storage bucket, OAuth provider, or browser-side
 service-role key is required. The `team-admin` Edge Function is required for
 in-app Lead Generator administration.
+
+### Windows: `supabase` is not recognized
+
+The CLI is intentionally installed as a project dependency, not as a global
+Windows command. Run it from this repository through `npx`:
+
+```bat
+cd C:\Office-work\mypath-b2-crm
+npm install
+npx supabase --version
+npx supabase login
+npx supabase link --project-ref YOUR_PROJECT_REF
+npx supabase functions deploy team-admin
+```
+
+Find `YOUR_PROJECT_REF` in the Supabase dashboard URL:
+`https://supabase.com/dashboard/project/YOUR_PROJECT_REF`. Linking or deploying
+the hosted Function does not require Docker. Do not add `--no-verify-jwt`; this
+Function must remain authenticated.
 
 ## Commands
 
@@ -169,9 +189,10 @@ Lead Generator:
 - Imports CSV leads, manages assigned task status, and sees personal targets;
   cannot export, view deal values, archive/delete leads, or access founder-only routes.
 
-New in-app Lead Generator accounts receive a temporary password. They can access
-only `/change-password` until they set a compliant permanent password. Disabled
-accounts receive no CRM data access even if an older JWT remains valid.
+Founder-created and Founder-reset passwords are immediately usable login
+passwords. Disabled accounts receive no CRM data access even if an older JWT
+remains valid; reactivation restores access without requiring another password
+change.
 
 The founder dashboard, sales contact/follow-up fields, lifecycle controls, deal values, archive actions, sales-cost entry, and expected-close input are founder-specific. Migration `202608030005_role_boundaries_and_quality.sql` enforces these boundaries in PostgreSQL as well as the UI and exposes a role-aware read projection that returns financial fields only to the founder.
 

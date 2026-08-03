@@ -40,14 +40,12 @@ export default function ChangePasswordPage() {
           MP
         </div>
         <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
-          Secure account setup
+          Account security
         </p>
-        <h1 className="mt-2 text-xl font-bold text-slate-950">
-          Choose your permanent password
-        </h1>
+        <h1 className="mt-2 text-xl font-bold text-slate-950">Change your password</h1>
         <p className="mt-2 text-sm leading-6 text-slate-600">
-          Hi {profile?.full_name?.split(' ')[0]}. Your temporary password worked, but
-          normal CRM data stays blocked until you replace it.
+          Hi {profile?.full_name?.split(' ')[0]}. You can optionally replace your current
+          password here. Founder-issued passwords already provide normal CRM access.
         </p>
         {error ? (
           <div className="mt-4">
@@ -94,7 +92,7 @@ export default function ChangePasswordPage() {
             />
           </Field>
           <Button className="w-full" type="submit" loading={isSubmitting}>
-            Save password and enter CRM
+            Save new password
           </Button>
         </form>
         <button

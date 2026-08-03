@@ -5,7 +5,7 @@ This repository is ready for a static Cloudflare Pages deployment. Supabase rema
 ## Prerequisites
 
 - A Cloudflare account and a GitHub or GitLab repository containing this app.
-- A production Supabase project with all eight migrations, `team-admin` deployed, and the initial Founder verified.
+- A production Supabase project with all nine migrations, `team-admin` deployed, and the initial Founder verified.
 - The Supabase project URL and browser-safe anon/publishable key.
 - A chosen production branch (`main` below) and, optionally, a custom domain already added to Cloudflare DNS.
 - A clean local acceptance run using Node 22.16.0. Never use the service-role key as a Pages variable.
@@ -70,8 +70,8 @@ If you intentionally keep Workers Static Assets instead, its SPA configuration m
 
 Before the first later deployment:
 
-1. Apply all migrations through `202608030008_team_operations.sql` and deploy `team-admin` with JWT verification enabled.
-2. Create Noor and Hiba, assign their profile roles, and disable public signup.
+1. Apply all migrations through `202608040009_direct_login_account_access.sql` and deploy `team-admin` with JWT verification enabled.
+2. Create Noor as the initial Founder, then create Lead Generators from CRM Settings; disable public signup.
 3. Set the Supabase Auth **Site URL** to the final production origin, such as `https://crm.example.com`.
 4. Add the exact `*.pages.dev` and custom-domain origins to Auth redirect URLs only if a future version adds confirmation, recovery, magic-link, or OAuth flows. V1 password sign-in does not use redirect-based authentication.
 5. Keep the anon/publishable key in Pages build variables and keep all privileged keys out of the site.
@@ -91,4 +91,4 @@ npm test
 npm run build
 ```
 
-Confirm `dist/index.html` exists and `dist/_redirects` does not. After deployment, manually verify login, logout, refresh on every client-side route, founder-only URLs, a Hiba delete denial, a stage-history write, and CSV import/export. Do not promote a preview build until those checks pass.
+Confirm `dist/index.html` exists and `dist/_redirects` does not. After deployment, manually verify login, logout, refresh on every client-side route, founder-only URLs, a Lead Generator delete denial, a stage-history write, and CSV import/export. Do not promote a preview build until those checks pass.

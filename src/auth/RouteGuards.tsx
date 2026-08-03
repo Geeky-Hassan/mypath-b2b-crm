@@ -34,12 +34,6 @@ export function ProtectedRoute({ children }: { children: ReactNode }) {
       </div>
     )
   }
-  if (profile.must_change_password && location.pathname !== '/change-password') {
-    return <Navigate to="/change-password" replace />
-  }
-  if (!profile.must_change_password && location.pathname === '/change-password') {
-    return <Navigate to="/dashboard" replace />
-  }
   return children
 }
 

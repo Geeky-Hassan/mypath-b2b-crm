@@ -66,8 +66,9 @@ begin
   order by profile.created_at
   limit 1;
 
-  -- A one-user development project can still load the samples. Once Hiba is
-  -- created, rerun after deleting the samples if her creator attribution is wanted.
+  -- A one-user development project can still load the samples. If a Lead
+  -- Generator is later added, rerun after deleting the samples if their creator
+  -- attribution is wanted.
   v_lead_generator_id := coalesce(v_lead_generator_id, v_founder_id);
 
   insert into public.leads (
@@ -176,7 +177,7 @@ begin
         'lead_added',
         v_lead_generator_id,
         now() - interval '24 days',
-        'Hiba found the organisation while researching higher-education providers expanding online programmes.',
+        'The Lead Generator found the organisation while researching higher-education providers expanding online programmes.',
         false,
         null
       ),

@@ -90,7 +90,7 @@ describe('transactional CSV persistence', () => {
           expected_close_date: '2026-09-01',
         },
       ],
-      'hiba-1',
+      'lead-generator-1',
       false,
     )
 

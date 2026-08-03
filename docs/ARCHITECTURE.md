@@ -3,7 +3,7 @@
 ## Application shape
 
 The CRM remains a client-rendered Vite React SPA. React Router owns public,
-authenticated, forced-password, and founder-only boundaries. Supabase Auth
+authenticated and founder-only boundaries. Supabase Auth
 restores email/password sessions, while `src/services/crm.ts` centralizes data
 access. Privileged Auth administration runs only in the `team-admin` Supabase
 Edge Function.
@@ -38,9 +38,14 @@ Migration `202608030007_stage_context_and_follow_up.sql` adds a description, fol
 
 Migration `202608030008_team_operations.sql` adds optional E.164 phone storage,
 profile work details and account state, tasks, and task history. Its
-`private.can_use_crm()` helper makes an Active account with completed password
-onboarding a precondition for every CRM data policy. A disabled session receives
-no CRM rows; a temporary-password session can read only its own profile.
+`private.can_use_crm()` helper makes an Active account a precondition for every
+CRM data policy. A disabled session receives no CRM rows.
+
+Migration `202608040009_direct_login_account_access.sql` clears legacy forced
+password-onboarding flags and aligns database access with Founder-managed direct
+login credentials. The Edge Function confirms email on create, password reset,
+and reactivation, while RLS continues to make account status the immediate data
+access boundary.
 
 ## Pipeline mutation and provenance
 
@@ -56,7 +61,7 @@ Stage-to-stage conversions require actual history entry into the denominator sta
 
 ## Authorization
 
-Anonymous access remains revoked. Active, onboarded users can read shared
+Anonymous access remains revoked. Active users can read shared
 profiles, non-financial lead context, activities, and history. Lead Generators
 see only assigned tasks and can change only status/completion note; the Founder
 owns task creation, assignment, cancellation, editing, and deletion. Existing

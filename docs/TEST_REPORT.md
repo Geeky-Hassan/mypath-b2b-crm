@@ -1,14 +1,14 @@
 # MyPath CRM V1 Test Report
 
-Date: 2026-08-03
+Date: 2026-08-04
 
 ## Release result
 
 The application is ready for Supabase-backed staging. Static checks,
 unit/component/contract tests, and the production build pass. Production release
 remains conditional on applying all migrations through
-`202608030008_team_operations.sql`, deploying `team-admin`, and completing live
-Founder/active/disabled/temporary-password checks from [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
+`202608040009_direct_login_account_access.sql`, deploying `team-admin`, and
+completing live Founder/active/disabled checks from [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
 
 ## Automated results
 
@@ -17,7 +17,7 @@ Founder/active/disabled/temporary-password checks from [ADMIN_GUIDE.md](ADMIN_GU
 | Dependency install | Pass   | `npm install` completed with lockfile present                                                                                          |
 | ESLint             | Pass   | Zero lint errors and zero allowed warnings                                                                                             |
 | TypeScript         | Pass   | Project references completed without emit or errors                                                                                    |
-| Vitest             | Pass   | 18 test files, 82 tests passed                                                                                                         |
+| Vitest             | Pass   | 18 test files, 84 tests passed                                                                                                         |
 | Prettier           | Pass   | All checked files match formatting rules                                                                                               |
 | Production build   | Pass   | Vite produced `dist/index.html` and static assets                                                                                      |
 | SPA fallback       | Pass   | Build contains `dist/index.html` and relies on Cloudflare Pages' native SPA fallback; no conflicting catch-all `_redirects` is emitted |
@@ -36,11 +36,11 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Every detailed-stage-to-funnel mapping, funnel counts, conversion denominators, lead-to-paid-pilot conversion, stage timing, sales-cycle timing, target progress, breakdowns, and missing-data behavior.
 - Founder and Lead Generator permission helpers, including archive/deal controls and the single allowed Lead Generator stage transition.
 - Protected-route return paths and founder-route denial/allow behavior.
-- Forced temporary-password routing and account password policy/generation.
+- Direct Founder-issued password access and account password policy/generation.
 - Login form validation, credential submission, and safe authentication errors.
 - Lead form required-field and successful minimal-create component flows.
 - Static RLS migration contract for authenticated lead access, financial-column isolation, database-enforced Lead Generator boundaries, founder/archive deletion, owner-scoped target reads, founder-only target writes, anonymous revocation, and trigger-owned stage history.
-- Disabled/password-onboarding data blocking, assigned-task isolation, Founder task administration, and trigger-owned task history contracts.
+- Disabled-account data blocking, assigned-task isolation, Founder task administration, and trigger-owned task history contracts.
 - Team attribution metrics for lead creator, lead owner, activity actor, stage actor, task assignee, and target progress.
 - Edge Function contract checks for caller revalidation, Founder-only account actions, Lead Generator-only targets, sanitized errors, and frontend service-key exclusion.
 - Rerunnable sample-data contract for two stable leads with contextual stage
@@ -57,7 +57,7 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Session restoration, auth-state subscription cleanup, stale profile-request protection, logout error handling, and safe post-login local redirects are implemented.
 - Founder-only routes have direct route guards. Navigation hiding is not treated as authorization.
 - RLS policies are scoped to `authenticated`; anonymous table and sequence grants are revoked in the hardening migration.
-- Every active CRM policy also checks Active account state and completed password onboarding. Temporary-password users can read only their own profile.
+- Every active CRM policy also checks Active account state; disabled users receive no CRM rows even while an old JWT exists.
 - Lead Generator permanent deletion is blocked by founder RLS and archived-state requirements.
 - Lead Generator sales/lifecycle/archive fields and later pipeline transitions are blocked by a database trigger; proposed value and expected close date are hidden by the authorised read projection.
 - Target writes and settings changes require founder status; target reads remain owner-scoped for Lead Generators.
@@ -72,10 +72,10 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 
 ## Manual checks still required
 
-- Apply all eight migrations to a non-production Supabase project and deploy `team-admin`.
-- Use real Noor and Hiba sessions to execute every RLS check in the administrator guide.
+- Apply all nine migrations to a non-production Supabase project and deploy `team-admin`.
+- Use real Founder and Lead Generator sessions to execute every RLS check in the administrator guide.
 - Confirm valid/invalid login, refresh restoration, and logout against Supabase Auth.
-- Verify account creation, forced password change, reset, disable, and reactivate with four session states.
+- Verify direct-login account creation, password reset, disable, and reactivate with Founder and Lead Generator sessions.
 - Execute direct task requests as a Lead Generator to prove create/reassign/delete denials.
 - Confirm stage moves create exactly one history record with the correct actor.
 - Force one CSV constraint failure in staging and confirm the accepted batch remains absent.
