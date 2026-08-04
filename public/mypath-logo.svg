@@ -1,7 +1,0 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 64" role="img" aria-labelledby="title">
-  <title id="title">MyPath</title>
-  <rect width="96" height="64" rx="16" fill="#1769f5"/>
-  <path d="M19 45V27c0-6 9-6 9 0v18M28 27c0-6 10-6 10 0v18" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M45 48V25m0 2c4-5 15-5 19 1 5 8 0 18-9 18-4 0-8-2-10-5" fill="none" stroke="#fff" stroke-width="8" stroke-linecap="round" stroke-linejoin="round"/>
-  <path d="M45 41v12" fill="none" stroke="#9cbcff" stroke-width="8" stroke-linecap="round"/>
-</svg>
