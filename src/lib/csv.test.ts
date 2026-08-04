@@ -2,13 +2,17 @@ import { describe, expect, it } from 'vitest'
 import {
   IMPORT_FIELDS,
   autoMapColumns,
+  blankImportTemplateCsv,
   importTemplateCsv,
   importFieldsForRole,
+  importReportCsv,
   leadGeneratorTemplateCsv,
   leadsToExportCsv,
   mapCsvRecord,
+  mappingConflicts,
   parseCsvText,
   resolveOwnerId,
+  validateCsvFile,
 } from './csv'
 
 describe('CSV parsing and mapping', () => {
@@ -43,6 +47,14 @@ describe('CSV parsing and mapping', () => {
     expect(mapped.country).toBe('')
   })
 
+  it('reports duplicate mappings before a preview is created', () => {
+    const mapping = autoMapColumns(['Company'])
+    mapping.contact_name = 'Company'
+    expect(mappingConflicts(mapping)).toEqual([
+      'Company is mapped to Company name and Contact name',
+    ])
+  })
+
   it('generates a parseable template with every supported import column', () => {
     const parsed = parseCsvText(importTemplateCsv())
     expect(parsed.headers).toEqual(IMPORT_FIELDS.map((field) => field.key))
@@ -58,6 +70,48 @@ describe('CSV parsing and mapping', () => {
     expect(parsed.headers).not.toContain('proposed_value')
     expect(parsed.headers).not.toContain('current_pipeline_stage')
     expect(parsed.rows).toHaveLength(2)
+  })
+
+  it('creates blank role-aware templates with only a heading row', () => {
+    const founder = parseCsvText(blankImportTemplateCsv(true))
+    const leadGenerator = parseCsvText(blankImportTemplateCsv(false))
+    expect(founder.headers).toEqual(IMPORT_FIELDS.map((field) => field.key))
+    expect(leadGenerator.headers).toEqual(
+      importFieldsForRole(false).map((field) => field.key),
+    )
+    expect(founder.rows).toEqual([])
+    expect(leadGenerator.rows).toEqual([])
+  })
+
+  it('creates a safe downloadable row validation report', () => {
+    const report = parseCsvText(
+      importReportCsv([
+        {
+          line: 4,
+          company: '=Bad formula',
+          email: 'bad@example.com',
+          status: 'invalid',
+          reasons: ['Company name is required'],
+        },
+      ]),
+    )
+    expect(report.rows[0]?.status).toBe('invalid')
+    expect(report.rows[0]?.company_name).toBe("'=Bad formula")
+  })
+
+  it('rejects non-CSV, empty, and oversized files before parsing', () => {
+    expect(validateCsvFile({ name: 'leads.xlsx', size: 100 })).toContain('.csv')
+    expect(validateCsvFile({ name: 'leads.csv', size: 0 })).toContain('empty')
+    expect(validateCsvFile({ name: 'leads.csv', size: 6 * 1024 * 1024 })).toContain(
+      'larger',
+    )
+    expect(validateCsvFile({ name: 'leads.csv', size: 100 })).toBeNull()
+  })
+
+  it('reports duplicate headings and invalid UTF-8 replacement characters', () => {
+    const parsed = parseCsvText('Company,company\nNorthstar,Duplicate\uFFFD')
+    expect(parsed.errors.join(' ')).toContain('Duplicate column heading')
+    expect(parsed.errors.join(' ')).toContain('CSV UTF-8')
   })
 
   it('escapes spreadsheet formulas during export', () => {

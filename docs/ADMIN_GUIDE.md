@@ -18,6 +18,7 @@ Apply every migration in filename order through the Supabase SQL Editor or CLI:
 8. `202608030008_team_operations.sql`
 9. `202608040009_direct_login_account_access.sql`
 10. `202608040010_safe_team_member_removal.sql`
+11. `202608040011_task_assignment_consistency.sql`
 
 Then deploy the authenticated Edge Function:
 
@@ -130,6 +131,9 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
   through `team-admin`; a Lead Generator receives HTTP 403 for admin actions.
 - Deleting a task removes its `task_events`; refresh Team and Tasks and confirm
   the task no longer contributes to member counts or recent activity.
+- Permanently deleting an archived lead removes any tasks linked to that lead;
+  merely archiving the lead retains its tasks. Lead Generator task and dashboard
+  screens revalidate on focus and periodically while visible.
 - Removing a Lead Generator deletes their assigned tasks/targets, reassigns
   their owned leads, removes them from Team/User selectors, and blocks the old
   login. Historical lead/activity/stage actor labels become “Former team member.”
@@ -137,12 +141,13 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
 
 ## Data operations
 
-- Use CRM archive for recoverable removal. Permanent lead deletion cascades to activities and stage history.
+- Use CRM archive for recoverable removal. Permanent lead deletion cascades to
+  activities, stage history, linked tasks, and their task events.
 - Treat CSV export as a portability/reporting extract, not a full backup.
 - Before migrations or bulk imports, take a database backup using the Supabase-supported backup or PostgreSQL dump workflow available for the project.
 - Periodically test a restore into a separate project. A backup is not proven until restoration is verified.
 - Keep Auth users and database data in the same recovery plan; a leads-only CSV cannot reconstruct user IDs or audit ownership.
-- After migration 10 and before bulk import, run the read-only
+- After migration 11 and before bulk import, run the read-only
   `supabase/verification/pre_import_readiness.sql` query. Resolve all `FAIL`
   results and review duplicate/disabled-owner `WARNING` results.
 

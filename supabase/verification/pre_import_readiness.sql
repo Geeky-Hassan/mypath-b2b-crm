@@ -31,6 +31,23 @@ with checks as (
   union all
 
   select
+    25,
+    'linked_task_cascade',
+    'fail',
+    exists (
+      select 1
+      from pg_constraint constraint_row
+      where constraint_row.contype = 'f'
+        and constraint_row.conname = 'crm_tasks_lead_id_fkey'
+        and constraint_row.conrelid = 'public.crm_tasks'::regclass
+        and constraint_row.confrelid = 'public.leads'::regclass
+        and constraint_row.confdeltype = 'c'
+    ),
+    'Permanently deleting a lead also deletes its linked tasks and task-event history.'
+
+  union all
+
+  select
     30,
     'rls_enabled',
     'fail',

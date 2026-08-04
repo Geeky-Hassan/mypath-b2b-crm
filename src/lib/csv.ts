@@ -41,6 +41,17 @@ export const IMPORT_FIELDS = [
 export type ImportFieldKey = (typeof IMPORT_FIELDS)[number]['key']
 export type ColumnMapping = Record<ImportFieldKey, string>
 
+export const MAX_CSV_FILE_BYTES = 5 * 1024 * 1024
+export const MAX_CSV_IMPORT_ROWS = 5_000
+
+export interface CsvImportReportRow {
+  line: number
+  company: string
+  email: string
+  status: 'ready' | 'duplicate' | 'invalid'
+  reasons: string[]
+}
+
 export const LEAD_GENERATOR_IMPORT_KEYS: ImportFieldKey[] = [
   'company_name',
   'website',
@@ -81,16 +92,39 @@ export interface ParsedCsv {
 }
 
 export function parseCsvText(text: string): ParsedCsv {
-  const result = Papa.parse<Record<string, string>>(text, {
+  const result = Papa.parse<Record<string, string>>(text.replaceAll('\u0000', ''), {
     header: true,
     skipEmptyLines: 'greedy',
     transformHeader: (header) => header.replace(/^\uFEFF/, '').trim(),
     transform: (value) => value.trim(),
   })
+  const headers = result.meta.fields ?? []
+  const duplicateHeaders = headers.filter(
+    (header, index) =>
+      headers.findIndex(
+        (candidate) => normalizedHeader(candidate) === normalizedHeader(header),
+      ) !== index,
+  )
+  const errors = result.errors.map(
+    (error) => `Row ${(error.row ?? 0) + 2}: ${error.message}`,
+  )
+  if (duplicateHeaders.length) {
+    errors.push(`Duplicate column heading: ${[...new Set(duplicateHeaders)].join(', ')}`)
+  }
+  if (result.data.length > MAX_CSV_IMPORT_ROWS) {
+    errors.push(
+      `The file has ${result.data.length.toLocaleString()} rows; split it into batches of ${MAX_CSV_IMPORT_ROWS.toLocaleString()} or fewer.`,
+    )
+  }
+  if (text.includes('\uFFFD')) {
+    errors.push(
+      'Some characters could not be decoded. Save the file as CSV UTF-8 and retry.',
+    )
+  }
   return {
-    headers: result.meta.fields ?? [],
+    headers,
     rows: result.data,
-    errors: result.errors.map((error) => `Row ${(error.row ?? 0) + 2}: ${error.message}`),
+    errors,
   }
 }
 
@@ -122,6 +156,21 @@ export function autoMapColumns(headers: string[]): ColumnMapping {
       return [field.key, match ?? '']
     }),
   ) as ColumnMapping
+}
+
+export function mappingConflicts(mapping: ColumnMapping): string[] {
+  const selected = Object.entries(mapping).filter((entry) => entry[1]) as Array<
+    [ImportFieldKey, string]
+  >
+  const columns = new Set(selected.map(([, source]) => source))
+  return [...columns]
+    .map((source) => {
+      const fields = selected
+        .filter(([, selectedSource]) => selectedSource === source)
+        .map(([key]) => IMPORT_FIELDS.find((field) => field.key === key)?.label ?? key)
+      return fields.length > 1 ? `${source} is mapped to ${fields.join(' and ')}` : ''
+    })
+    .filter(Boolean)
 }
 
 export function mapCsvRecord(
@@ -242,6 +291,37 @@ export function leadGeneratorTemplateCsv(): string {
   })
 }
 
+export function blankImportTemplateCsv(isFounder: boolean): string {
+  const columns = isFounder
+    ? IMPORT_FIELDS.map((field) => field.key)
+    : LEAD_GENERATOR_IMPORT_KEYS
+  return `${Papa.unparse({ fields: [...columns], data: [] }, { newline: '\r\n' })}\r\n`
+}
+
+export function importReportCsv(rows: CsvImportReportRow[]): string {
+  return Papa.unparse(
+    rows.map((row) => ({
+      row: row.line,
+      company_name: row.company,
+      contact_email: row.email,
+      status: row.status,
+      report: row.reasons.join(' | ') || 'Valid row',
+    })),
+    { newline: '\r\n', escapeFormulae: true },
+  )
+}
+
+export function validateCsvFile(file: Pick<File, 'name' | 'size'>): string | null {
+  if (!file.name.toLowerCase().endsWith('.csv')) {
+    return 'Choose a .csv file. Excel workbooks must first be saved as CSV UTF-8.'
+  }
+  if (file.size === 0) return 'The selected CSV file is empty.'
+  if (file.size > MAX_CSV_FILE_BYTES) {
+    return `The CSV is larger than ${MAX_CSV_FILE_BYTES / 1024 / 1024} MB. Split it into smaller batches.`
+  }
+  return null
+}
+
 export function leadsToExportCsv(leads: LeadRecord[]): string {
   const rows = leads.map((lead) => ({
     ...Object.fromEntries(
@@ -277,7 +357,7 @@ export function resolveOwnerId(
 }
 
 export function downloadText(filename: string, content: string): void {
-  const blob = new Blob([content], { type: 'text/csv;charset=utf-8' })
+  const blob = new Blob(['\uFEFF', content], { type: 'text/csv;charset=utf-8' })
   const url = URL.createObjectURL(blob)
   const anchor = document.createElement('a')
   anchor.href = url

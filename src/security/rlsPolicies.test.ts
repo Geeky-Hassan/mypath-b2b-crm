@@ -55,6 +55,13 @@ const safeRemoval = readFileSync(
   ),
   'utf8',
 )
+const taskConsistency = readFileSync(
+  new URL(
+    '../../supabase/migrations/202608040011_task_assignment_consistency.sql',
+    import.meta.url,
+  ),
+  'utf8',
+)
 const preImportReadiness = readFileSync(
   new URL('../../supabase/verification/pre_import_readiness.sql', import.meta.url),
   'utf8',
@@ -231,6 +238,14 @@ describe('RLS migration contract', () => {
     expect(safeRemoval).toContain(
       'grant execute on function public.delete_crm_task(uuid) to authenticated',
     )
+  })
+
+  it('removes linked task assignments when a lead is permanently deleted', () => {
+    expect(taskConsistency).toContain('drop constraint if exists crm_tasks_lead_id_fkey')
+    expect(taskConsistency).toMatch(
+      /foreign key \(lead_id\)[\s\S]*references public\.leads\(id\)[\s\S]*on delete cascade/,
+    )
+    expect(taskConsistency).not.toMatch(/delete from public\.leads/)
   })
 
   it('removes team workload without deleting or falsifying lead audit history', () => {

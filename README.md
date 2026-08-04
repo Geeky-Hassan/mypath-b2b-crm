@@ -76,8 +76,9 @@ Apply the migrations in filename order using the Supabase SQL Editor or CLI:
 8. `supabase/migrations/202608030008_team_operations.sql`
 9. `supabase/migrations/202608040009_direct_login_account_access.sql`
 10. `supabase/migrations/202608040010_safe_team_member_removal.sql`
+11. `supabase/migrations/202608040011_task_assignment_consistency.sql`
 
-Deploy the authenticated account-administration function after migration 10:
+Deploy the authenticated account-administration function after applying all 11 migrations:
 
 ```bash
 npx supabase login
@@ -206,7 +207,17 @@ Lost remains a separate lifecycle state and requires a reason. Entering Paid-Pil
 
 ## CSV workflow
 
-The sample file is at [`public/templates/mypath-leads-template.csv`](public/templates/mypath-leads-template.csv) and is downloadable from `/import`. Other CSV layouts are accepted through explicit column mapping. The preview validates required and typed values, resolves owner email, reports invalid rows, and warns on normalized company website or contact email duplicates before a confirmation step. Accepted rows are sent in one PostgreSQL insert, so a database failure rolls back the accepted batch rather than leaving a partial import.
+The Founder example and blank files are at
+[`public/templates/mypath-leads-template.csv`](public/templates/mypath-leads-template.csv)
+and
+[`public/templates/mypath-leads-blank-template.csv`](public/templates/mypath-leads-blank-template.csv).
+The import screen also accepts drag-and-drop and other CSV layouts through
+explicit column mapping. Files are limited to 5 MB and 5,000 rows per batch.
+The preview rejects duplicate source mappings, validates required and typed
+values, resolves owner email, reports invalid rows, warns on normalized company
+website or contact email duplicates, and offers a downloadable row report before
+confirmation. Accepted rows are sent in one PostgreSQL insert, so a database
+failure rolls back the accepted batch rather than leaving a partial import.
 
 Template columns, in order:
 
@@ -225,6 +236,8 @@ expected_close_date, lost_reason, notes
 
 The Lead Generator template is
 [`public/templates/mypath-lead-generator-template.csv`](public/templates/mypath-lead-generator-template.csv).
+An example-free version is available at
+[`public/templates/mypath-lead-generator-blank-template.csv`](public/templates/mypath-lead-generator-blank-template.csv).
 Open it in Excel and save as **CSV UTF-8** before upload. Lead Generator imports
 accept only permitted research, contact, qualification, owner, date, and notes
 fields, and always create Active records at Lead Added. Forbidden columns are
@@ -236,7 +249,7 @@ live Excel synchronization.
 
 CSV export is useful for reporting and portability, but it is not a full backup: activities, stage history, profiles, targets, settings, Auth users, and audit relationships are not included. Before migrations or bulk work, use the backup or PostgreSQL dump workflow supported by the Supabase project. Test restoration into a separate project periodically. See the [administrator guide](docs/ADMIN_GUIDE.md) for the recovery checklist.
 
-Before a large import, apply migration 10, take a Supabase database backup, and
+Before a large import, apply migration 11, take a Supabase database backup, and
 run [`supabase/verification/pre_import_readiness.sql`](supabase/verification/pre_import_readiness.sql)
 in the SQL Editor. Resolve every `FAIL`; review `WARNING` rows for intentional
 duplicates or disabled owners. The script is read-only. Import preview does not

@@ -56,6 +56,12 @@ actors are deliberately preserved instead of deleted or attributed to another
 person. Companion triggers reject any new lead, target, or task assignment to a
 Disabled or Removed profile, including direct API requests.
 
+Migration `202608040011_task_assignment_consistency.sql` changes only the task
+to lead foreign key: archiving retains linked work, while Founder-only permanent
+lead deletion now cascades to its linked tasks and their events. Task and Lead
+Generator dashboard queries also revalidate on focus and at a low-frequency
+visible-tab interval so another user's deletion does not remain as stale work.
+
 ## Pipeline mutation and provenance
 
 The board loads the shared lead graph once, then filters locally. On drop, the UI checks explicit stage requirements and displays non-blocking completeness warnings. Every move requires a stage description and may attach a dated follow-up; entering Follow-up Required automatically requires the date. A single transactional function can set proposed value and stage together. PostgreSQL triggers synchronize Won lifecycle and append `stage_history` with the authenticated actor, database timestamp, description, and follow-up data. Clients have no direct stage-history write grant.
@@ -87,7 +93,14 @@ invokes the service-role-only cleanup transaction and restores the Auth identity
 if that transaction fails. A removed account remains banned and its email is
 replaced, while RLS independently rejects its non-Active profile.
 
-CSV preview and validation happen in the browser, but accepted imports are persisted with one counted multi-row PostgREST insert. PostgreSQL executes that statement transactionally: if any accepted row fails a policy or constraint, none of the accepted rows are committed, and the client also rejects a response that does not confirm the full expected row count.
+CSV preview and validation happen in the browser. File size, row count, decoding,
+duplicate headings, duplicate field mappings, field values, owners, and lead
+duplicates are checked before confirmation; the complete row report can be
+downloaded without writing data. Accepted imports are persisted with one counted
+multi-row PostgREST insert. PostgreSQL executes that statement transactionally:
+if any accepted row fails a policy or constraint, none of the accepted rows are
+committed, and the client also rejects a response that does not confirm the full
+expected row count.
 
 ## Verification surface
 

@@ -10,6 +10,7 @@ import {
   type SelectHTMLAttributes,
   type TextareaHTMLAttributes,
 } from 'react'
+import { BrandMark } from '../BrandMark'
 
 function cn(...values: Array<string | false | null | undefined>): string {
   return values.filter(Boolean).join(' ')
@@ -75,17 +76,20 @@ export const Card = forwardRef<HTMLDivElement, HTMLAttributes<HTMLDivElement>>(
   },
 )
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return (
-    <input
-      className={cn(
-        'h-9 min-h-9 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-500 focus:ring-3 focus:ring-blue-100 disabled:bg-slate-100',
-        className,
-      )}
-      {...props}
-    />
-  )
-}
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input({ className, ...props }, ref) {
+    return (
+      <input
+        ref={ref}
+        className={cn(
+          'h-9 min-h-9 w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 text-[13px] text-slate-900 outline-none transition placeholder:text-slate-500 hover:border-blue-300 focus:border-blue-500 focus:ring-3 focus:ring-blue-100 disabled:bg-slate-100',
+          className,
+        )}
+        {...props}
+      />
+    )
+  },
+)
 
 export function Select({ className, ...props }: SelectHTMLAttributes<HTMLSelectElement>) {
   return (
@@ -235,9 +239,7 @@ export function EmptyState({
 }) {
   return (
     <div className="flex min-h-40 flex-col items-center justify-center rounded-xl border border-dashed border-slate-300 bg-slate-50 p-5 text-center">
-      <div className="mb-3 flex size-9 items-center justify-center rounded-lg bg-gradient-to-br from-blue-50 to-cyan-50 text-[11px] font-bold text-blue-700 ring-1 ring-blue-100">
-        MP
-      </div>
+      <BrandMark className="mb-3 h-8 w-11" />
       <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
       <p className="mt-1 max-w-md text-xs leading-5 text-slate-500">{description}</p>
       {action ? <div className="mt-4">{action}</div> : null}
@@ -280,12 +282,14 @@ export function StatCard({
   detail,
   help,
   accent = 'teal',
+  density = 'default',
 }: {
   label: string
   value: string | number
   detail?: string
   help?: string
   accent?: 'teal' | 'blue' | 'amber' | 'violet'
+  density?: 'default' | 'compact'
 }) {
   const accents = {
     teal: 'bg-blue-500',
@@ -294,7 +298,12 @@ export function StatCard({
     violet: 'bg-violet-500',
   }
   return (
-    <Card className="relative overflow-hidden p-4">
+    <Card
+      className={cn(
+        'relative min-w-0 overflow-hidden',
+        density === 'compact' ? 'p-3.5' : 'p-4',
+      )}
+    >
       <span
         className={cn('absolute right-4 top-4 size-1.5 rounded-full', accents[accent])}
       />
@@ -311,8 +320,17 @@ export function StatCard({
           </span>
         ) : null}
       </p>
-      <p className="mt-2 text-2xl font-bold tracking-tight text-slate-950">{value}</p>
-      {detail ? <p className="mt-1 text-[11px] text-slate-500">{detail}</p> : null}
+      <p
+        className={cn(
+          'mt-2 [overflow-wrap:anywhere] font-bold leading-tight tracking-tight text-slate-950',
+          density === 'compact' ? 'text-lg' : 'text-2xl',
+        )}
+      >
+        {value}
+      </p>
+      {detail ? (
+        <p className="mt-1 break-words text-[11px] leading-4 text-slate-500">{detail}</p>
+      ) : null}
     </Card>
   )
 }

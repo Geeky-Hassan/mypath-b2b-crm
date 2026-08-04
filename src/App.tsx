@@ -5,6 +5,7 @@ import { FounderRoute, ProtectedRoute } from './auth/RouteGuards'
 import { AppShell } from './components/layout/AppShell'
 import { Alert, Button, PageLoader } from './components/ui'
 import { ToastProvider } from './components/ui/ToastProvider'
+import { BrandMark } from './components/BrandMark'
 import { env, envIssues } from './lib/config'
 
 const LoginPage = lazy(() => import('./pages/LoginPage'))
@@ -52,9 +53,7 @@ function ConfigurationScreen() {
   return (
     <main className="app-ambient flex min-h-screen items-center justify-center p-6">
       <div className="w-full max-w-lg rounded-xl border border-slate-200 bg-white p-7 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
-        <div className="mb-5 flex size-10 items-center justify-center rounded-lg bg-slate-900 text-sm font-black text-white">
-          MP
-        </div>
+        <BrandMark className="mb-5 h-10 w-14" />
         <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700">
           Setup required
         </p>

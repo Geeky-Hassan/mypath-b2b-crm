@@ -7,7 +7,7 @@ Date: 2026-08-04
 The application is ready for Supabase-backed staging. Static checks,
 unit/component/contract tests, and the production build pass. Production release
 remains conditional on applying all migrations through
-`202608040010_safe_team_member_removal.sql`, deploying `team-admin`, and
+`202608040011_task_assignment_consistency.sql`, deploying `team-admin`, and
 completing live Founder/active/disabled/removal checks from
 [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
 
@@ -18,11 +18,12 @@ completing live Founder/active/disabled/removal checks from
 | Dependency install | Pass   | `npm install` completed with lockfile present                                                                                          |
 | ESLint             | Pass   | Zero lint errors and zero allowed warnings                                                                                             |
 | TypeScript         | Pass   | Project references completed without emit or errors                                                                                    |
-| Vitest             | Pass   | 19 test files, 94 tests passed                                                                                                         |
+| Vitest             | Pass   | 20 test files, 102 tests passed                                                                                                        |
 | Prettier           | Pass   | All checked files match formatting rules                                                                                               |
 | Production build   | Pass   | Vite produced `dist/index.html` and static assets                                                                                      |
 | SPA fallback       | Pass   | Build contains `dist/index.html` and relies on Cloudflare Pages' native SPA fallback; no conflicting catch-all `_redirects` is emitted |
-| Route HTTP smoke   | Pass   | All 11 application routes returned the SPA shell with 200                                                                              |
+| Route HTTP smoke   | Pass   | Every application route returned the SPA shell with 200; logo and all four role-aware templates returned 200                           |
+| Supabase db lint   | Pass   | Linked `extensions`, `private`, and `public` schemas returned no errors                                                                |
 
 The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--localstorage-file` warning while starting jsdom. It does not originate in application code, no test fails, and the project pins the supported build runtime to Node 22.16.0. No application warning was suppressed.
 
@@ -31,7 +32,9 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Lead required fields, email/URL validation, date validation, lost reason, and proposed-value rules.
 - Optional phone handling, calling-country parsing, E.164 normalization, validation, and display formatting.
 - Website/email duplicate normalization and record exclusion during edits.
-- PapaParse quoting, header aliases, mapping, complete template generation, and spreadsheet-formula escaping.
+- PapaParse quoting, header aliases, duplicate heading/mapping detection,
+  role-aware blank/example template generation, file guardrails, downloadable
+  reports, UTF-8 warnings, and spreadsheet-formula escaping.
 - Atomic import payload normalization, one-statement persistence, empty imports, and failed-batch reporting.
 - Lead Generator CSV field restriction, protected-column stripping, and Excel-ready template generation.
 - Every detailed-stage-to-funnel mapping, funnel counts, conversion denominators, lead-to-paid-pilot conversion, stage timing, sales-cycle timing, target progress, breakdowns, and missing-data behavior.
@@ -44,8 +47,9 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
   the sanitized Edge Function request.
 - Static RLS migration contract for authenticated lead access, financial-column isolation, database-enforced Lead Generator boundaries, founder/archive deletion, owner-scoped target reads, founder-only target writes, anonymous revocation, and trigger-owned stage history.
 - Disabled-account data blocking, assigned-task isolation, Founder task administration, and trigger-owned task history contracts.
-- Atomic Founder task deletion, explicit task-event cleanup, repaired cascade,
-  zero-row rejection, and surfaced database failures.
+- Atomic Founder task deletion, explicit task-event cleanup, task-to-lead
+  cascade, focus/visible-tab refresh, zero-row rejection, and surfaced database
+  failures.
 - Team attribution metrics for lead creator, lead owner, activity actor, stage actor, task assignee, and target progress.
 - Edge Function contract checks for caller revalidation, Founder-only account
   actions, Lead Generator-only targets, account quarantine/removal, sanitized
@@ -86,7 +90,7 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 
 ## Manual checks still required
 
-- Apply all ten migrations to a non-production Supabase project and deploy `team-admin`.
+- Apply all 11 migrations to a non-production Supabase project and deploy `team-admin`.
 - Use real Founder and Lead Generator sessions to execute every RLS check in the administrator guide.
 - Confirm valid/invalid login, refresh restoration, and logout against Supabase Auth.
 - Verify direct-login account creation, password reset, disable, reactivate, and

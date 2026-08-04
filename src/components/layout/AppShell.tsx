@@ -2,6 +2,7 @@ import { useState, type ReactNode } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
 import { useAuth } from '../../auth/AuthContext'
 import { ROLE_LABELS, type UserRole } from '../../types/domain'
+import { BrandMark } from '../BrandMark'
 import { useToast } from '../ui/ToastProvider'
 
 interface NavItem {
@@ -174,9 +175,7 @@ export function AppShell() {
   const sidebar = (
     <>
       <div className="flex h-16 items-center gap-3 border-b border-blue-100 px-4">
-        <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-cyan-500 text-[11px] font-black tracking-wide text-white shadow-[0_8px_20px_rgba(37,99,235,0.24)]">
-          MP
-        </div>
+        <BrandMark className="h-9 w-12" />
         <div>
           <p className="text-sm font-bold tracking-tight text-slate-900">MyPath CRM</p>
           <p className="text-[11px] text-slate-500">Revenue workspace</p>
@@ -217,7 +216,7 @@ export function AppShell() {
 
   return (
     <div className="app-ambient min-h-screen">
-      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-blue-100 bg-white/90 shadow-[8px_0_30px_rgba(37,99,235,0.035)] backdrop-blur-xl lg:flex">
+      <aside className="fixed inset-y-0 left-0 z-30 hidden w-56 flex-col border-r border-blue-100 bg-white/92 shadow-[8px_0_30px_rgba(37,99,235,0.035)] backdrop-blur-xl lg:flex">
         {sidebar}
       </aside>
       {mobileOpen ? (

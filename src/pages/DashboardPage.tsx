@@ -28,6 +28,7 @@ import {
   Textarea,
 } from '../components/ui'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { useAutoRefresh } from '../hooks/useAutoRefresh'
 import {
   currentMonthValue,
   dateInputValue,
@@ -790,10 +791,10 @@ function LeadGeneratorDashboard({
   return (
     <div className="space-y-5">
       <Card className="overflow-hidden border-blue-100">
-        <div className="grid gap-4 bg-gradient-to-r from-blue-50/90 via-white to-cyan-50/70 p-5 lg:grid-cols-[1fr_auto] lg:items-center">
+        <div className="grid gap-3 bg-gradient-to-r from-blue-50/90 via-white to-cyan-50/70 p-4 xl:grid-cols-[minmax(0,1fr)_auto] xl:items-center">
           <div>
             <Badge tone="blue">My focus</Badge>
-            <h2 className="mt-3 text-lg font-bold text-slate-950">
+            <h2 className="mt-2 text-base font-bold text-slate-950">
               {profile.job_title || 'Lead Generator'}
             </h2>
             <p className="mt-1 max-w-3xl whitespace-pre-wrap text-xs leading-5 text-slate-600">
@@ -801,46 +802,56 @@ function LeadGeneratorDashboard({
                 'Research qualified companies, record complete lead information, qualify strong opportunities, and keep your assigned work current.'}
             </p>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-2 xl:justify-end">
             <Link to="/leads">
-              <Button>Add lead</Button>
+              <Button size="sm">Add lead</Button>
             </Link>
             <Link to="/import">
-              <Button variant="secondary">Bulk import</Button>
+              <Button size="sm" variant="secondary">
+                Bulk import
+              </Button>
             </Link>
             <Link to="/tasks">
-              <Button variant="secondary">My tasks</Button>
+              <Button size="sm" variant="secondary">
+                My tasks
+              </Button>
             </Link>
             <Link to="/leads?view=missing">
-              <Button variant="ghost">Missing information</Button>
+              <Button size="sm" variant="ghost">
+                Missing information
+              </Button>
             </Link>
           </div>
         </div>
       </Card>
-      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
+      <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
         <StatCard
           label="Assigned leads"
           value={assigned.length}
           detail="Your current workload"
           help="Active and nurture leads where you are the current owner. This is separate from leads you sourced."
           accent="blue"
+          density="compact"
         />
         <StatCard
           label="Weekly lead target"
           value={weeklyTarget ? weeklyTarget.target_value : 'Not enough data'}
           detail={`${week.start} to ${week.end}`}
           help="The Leads Added weekly target assigned to you for the current Monday-to-Sunday period."
+          density="compact"
         />
         <StatCard
           label="Leads added this week"
           value={addedThisWeek.length}
           help="Leads you created during the current Monday-to-Sunday period."
+          density="compact"
         />
         <StatCard
           label="Qualified leads added"
           value={qualifiedAdded.length}
           help="Leads you created this week that have reached Qualified or later."
           accent="blue"
+          density="compact"
         />
         <StatCard
           label="Target completion"
@@ -854,6 +865,7 @@ function LeadGeneratorDashboard({
           }
           help="Leads you created this week ÷ your weekly Leads Added target."
           accent="violet"
+          density="compact"
         />
         <StatCard
           label="Missing information"
@@ -861,6 +873,7 @@ function LeadGeneratorDashboard({
           detail="Across your active lead set"
           help="Your leads missing at least one editable research field: website, contact name, contact email, country, or segment."
           accent="amber"
+          density="compact"
         />
       </div>
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -869,18 +882,21 @@ function LeadGeneratorDashboard({
           value={tasksSummary.overdue}
           help="Open assigned tasks with a due date before today."
           accent="amber"
+          density="compact"
         />
         <StatCard
           label="Due today"
           value={tasksSummary.today}
           help="Open assigned tasks due today."
           accent="violet"
+          density="compact"
         />
         <StatCard
           label="Due this week"
           value={tasksSummary.thisWeek}
           help="Open assigned tasks due after today through Sunday."
           accent="blue"
+          density="compact"
         />
         <StatCard
           label="Recently completed"
@@ -888,6 +904,7 @@ function LeadGeneratorDashboard({
           detail="Last seven days"
           help="Assigned tasks currently marked Completed."
           accent="teal"
+          density="compact"
         />
       </div>
       {weeklyTarget ? (
@@ -1056,7 +1073,9 @@ export default function DashboardPage() {
     return { leads, targets, settings, salesCost, tasks }
   }, `dashboard-${profile?.id}-${month}`)
 
-  if (loading) return <PageLoader label="Calculating dashboard metrics…" />
+  useAutoRefresh(refresh)
+
+  if (loading && !data) return <PageLoader label="Calculating dashboard metrics…" />
   if (error || !data || !profile || !user)
     return (
       <Alert tone="error" title="Dashboard could not be loaded">

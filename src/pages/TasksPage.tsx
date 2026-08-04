@@ -1,5 +1,5 @@
 import { zodResolver } from '@hookform/resolvers/zod'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
@@ -21,6 +21,7 @@ import {
 } from '../components/ui'
 import { useToast } from '../components/ui/ToastProvider'
 import { useAsyncData } from '../hooks/useAsyncData'
+import { useAutoRefresh } from '../hooks/useAutoRefresh'
 import { dateInputValue, formatDate, formatDateTime } from '../lib/format'
 import { taskDueGroup, taskSummary, type DueGroup } from '../lib/tasks'
 import {
@@ -218,6 +219,7 @@ export default function TasksPage() {
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<TaskStatus | 'all'>('all')
   const [assignee, setAssignee] = useState('')
+  const [showClosed, setShowClosed] = useState(false)
   const { data, loading, error, refresh } = useAsyncData(async () => {
     const [tasks, profiles, leads] = await Promise.all([
       getTasks(),
@@ -227,10 +229,29 @@ export default function TasksPage() {
     return { tasks, profiles, leads }
   }, `tasks-${profile?.id}`)
 
+  useAutoRefresh(refresh)
+
+  useEffect(() => {
+    if (!data) return
+    const ids = new Set(data.tasks.map((task) => task.id))
+    if (selected && !ids.has(selected.id)) setSelected(null)
+    if (editing && !ids.has(editing.id)) {
+      setEditing(null)
+      setEditorOpen(false)
+    }
+    if (statusTask && !ids.has(statusTask.id)) setStatusTask(null)
+  }, [data, editing, selected, statusTask])
+
   const filtered = useMemo(() => {
     const needle = search.trim().toLowerCase()
     return (data?.tasks ?? []).filter((task) => {
       if (status !== 'all' && task.status !== status) return false
+      if (
+        status === 'all' &&
+        !showClosed &&
+        (task.status === 'completed' || task.status === 'cancelled')
+      )
+        return false
       if (assignee && task.assigned_to !== assignee) return false
       return (
         !needle ||
@@ -239,7 +260,7 @@ export default function TasksPage() {
           .includes(needle)
       )
     })
-  }, [assignee, data?.tasks, search, status])
+  }, [assignee, data?.tasks, search, showClosed, status])
 
   if (loading && !data) return <PageLoader label="Loading team tasks…" />
   if (error || !data || !profile || !user)
@@ -250,6 +271,9 @@ export default function TasksPage() {
     )
 
   const summary = taskSummary(data.tasks)
+  const closedCount = data.tasks.filter(
+    (task) => task.status === 'completed' || task.status === 'cancelled',
+  ).length
   const requestStatus = (task: CrmTask, value: TaskStatus) => {
     setStatusTask(task)
     setNextStatus(value)
@@ -301,24 +325,46 @@ export default function TasksPage() {
         }
       />
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-5">
-        <StatCard label="Open" value={summary.open} accent="blue" />
-        <StatCard label="Overdue" value={summary.overdue} accent="amber" />
-        <StatCard label="Due today" value={summary.today} accent="violet" />
-        <StatCard label="Due this week" value={summary.thisWeek} accent="teal" />
-        <StatCard label="Completed" value={summary.completed} accent="blue" />
+        <StatCard label="Open" value={summary.open} accent="blue" density="compact" />
+        <StatCard
+          label="Overdue"
+          value={summary.overdue}
+          accent="amber"
+          density="compact"
+        />
+        <StatCard
+          label="Due today"
+          value={summary.today}
+          accent="violet"
+          density="compact"
+        />
+        <StatCard
+          label="Due this week"
+          value={summary.thisWeek}
+          accent="teal"
+          density="compact"
+        />
+        <StatCard
+          label="Completed"
+          value={summary.completed}
+          accent="blue"
+          density="compact"
+        />
       </div>
-      <Card className="p-4">
-        <div className="grid gap-3 md:grid-cols-[minmax(220px,1fr)_180px_220px_auto]">
+      <Card className="p-3">
+        <div className="flex flex-wrap items-center gap-2">
           <Input
             aria-label="Search tasks"
             placeholder="Search tasks or linked leads…"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+            className="min-w-[220px] flex-1 sm:max-w-md"
           />
           <Select
             aria-label="Filter task status"
             value={status}
             onChange={(event) => setStatus(event.target.value as TaskStatus | 'all')}
+            className="w-full sm:w-40"
           >
             <option value="all">All statuses</option>
             {TASK_STATUSES.map((value) => (
@@ -332,6 +378,7 @@ export default function TasksPage() {
               aria-label="Filter assignee"
               value={assignee}
               onChange={(event) => setAssignee(event.target.value)}
+              className="w-full sm:w-48"
             >
               <option value="">All team members</option>
               {data.profiles.map((member) => (
@@ -340,10 +387,9 @@ export default function TasksPage() {
                 </option>
               ))}
             </Select>
-          ) : (
-            <div />
-          )}
+          ) : null}
           <Button
+            size="sm"
             variant="ghost"
             onClick={() => {
               setSearch('')
@@ -353,7 +399,19 @@ export default function TasksPage() {
           >
             Clear filters
           </Button>
+          <Button
+            size="sm"
+            variant={showClosed ? 'secondary' : 'ghost'}
+            aria-pressed={showClosed}
+            onClick={() => setShowClosed((current) => !current)}
+          >
+            {showClosed ? 'Hide closed history' : `Show closed history (${closedCount})`}
+          </Button>
         </div>
+        <p className="mt-2 text-[11px] leading-4 text-slate-500">
+          Cancelled tasks are retained as history. Permanently deleted tasks and their
+          events disappear for every assignee after refresh.
+        </p>
       </Card>
       {!filtered.length ? (
         <EmptyState
@@ -366,6 +424,7 @@ export default function TasksPage() {
         />
       ) : (
         groupDetails.map((group) => {
+          if (group.key === 'closed' && !showClosed && status === 'all') return null
           const groupTasks = filtered.filter((task) => taskDueGroup(task) === group.key)
           if (!groupTasks.length) return null
           return (
@@ -379,13 +438,13 @@ export default function TasksPage() {
                 </h2>
                 <Badge tone={group.tone}>{groupTasks.length}</Badge>
               </div>
-              <div className="grid gap-3 xl:grid-cols-2">
+              <div className="grid gap-3 xl:grid-cols-2 2xl:grid-cols-3">
                 {groupTasks.map((task) => (
-                  <Card key={task.id} className="p-4">
+                  <Card key={task.id} className="p-3.5">
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <button
-                          className="text-left text-sm font-bold text-slate-900 hover:text-blue-700"
+                          className="line-clamp-2 text-left text-[13px] font-bold leading-5 text-slate-900 hover:text-blue-700"
                           onClick={() => setSelected(task)}
                         >
                           {task.title}
@@ -409,12 +468,12 @@ export default function TasksPage() {
                       </Badge>
                     </div>
                     {task.description ? (
-                      <p className="mt-3 line-clamp-2 text-xs leading-5 text-slate-600">
+                      <p className="mt-2 line-clamp-2 text-xs leading-5 text-slate-600">
                         {task.description}
                       </p>
                     ) : null}
-                    <div className="mt-3 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-                      <span className="text-xs text-slate-500">
+                    <div className="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-2.5">
+                      <span className="text-[11px] text-slate-500">
                         {task.assignee?.full_name ?? 'Unknown assignee'} ·{' '}
                         {TASK_STATUS_LABELS[task.status]}
                       </span>

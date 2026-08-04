@@ -67,12 +67,15 @@ archive/restore, founder deletion, activities, notes, and stage history.
 
 Tasks may be lead-linked or general. The Founder creates, edits, assigns, cancels,
 and deletes them. Lead Generators see only assigned tasks and update status plus an
-optional completion note. The Team view reports factual creator, owner, activity
+optional completion note. Closed history is hidden by default; deleted tasks are
+removed for every assignee, and permanently deleting a linked lead also removes
+its tasks. The Team view reports factual creator, owner, activity
 actor, stage actor, task, and target metrics without rankings.
 
-Both roles can import mapped/validated CSV. Lead Generator imports are restricted
-to research and qualification fields and forced to Active at Lead Added; only the
-Founder can export. CSV remains the only spreadsheet exchange.
+Both roles can import mapped/validated CSV using role-aware blank/example
+templates, drag-and-drop, a row report, and explicit confirmation. Lead Generator
+imports are restricted to research and qualification fields and forced to Active
+at Lead Added; only the Founder can export. CSV remains the only spreadsheet exchange.
 
 The Founder creates, resets, disables, reactivates, and permanently removes Lead Generator accounts
 through a secured Supabase Edge Function. Founder-set passwords are immediately

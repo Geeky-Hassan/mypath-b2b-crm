@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { z } from 'zod'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
+import { BrandMark } from '../components/BrandMark'
 import { Alert, Button, Card, Field, Input } from '../components/ui'
 import { temporaryPasswordSchema } from '../lib/accountValidation'
 import { runTeamAdminAction } from '../services/crm'
@@ -36,9 +37,7 @@ export default function ChangePasswordPage() {
   return (
     <main className="app-ambient flex min-h-screen items-center justify-center p-5">
       <Card className="w-full max-w-md p-6">
-        <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-cyan-500 text-xs font-black text-white">
-          MP
-        </div>
+        <BrandMark className="h-10 w-14" />
         <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-blue-700">
           Account security
         </p>

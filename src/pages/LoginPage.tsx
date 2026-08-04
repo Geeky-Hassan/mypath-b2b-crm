@@ -4,6 +4,7 @@ import { useForm } from 'react-hook-form'
 import { Navigate } from 'react-router-dom'
 import { z } from 'zod'
 import { useAuth } from '../auth/AuthContext'
+import { BrandMark } from '../components/BrandMark'
 import { Alert, Button, Field, Input } from '../components/ui'
 
 const loginSchema = z.object({
@@ -66,9 +67,7 @@ export default function LoginPage({ returnTo }: { returnTo?: string }) {
         <div className="absolute -right-32 -top-24 size-96 rounded-full bg-blue-300/35 blur-3xl" />
         <div className="absolute -bottom-28 -left-20 size-80 rounded-full bg-cyan-200/35 blur-3xl" />
         <div className="relative flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-cyan-500 text-sm font-black text-white shadow-[0_10px_24px_rgba(37,99,235,0.2)]">
-            MP
-          </div>
+          <BrandMark className="h-10 w-14" />
           <div>
             <p className="text-sm font-bold">MyPath</p>
             <p className="text-[11px] text-slate-500">B2B CRM</p>
@@ -92,9 +91,7 @@ export default function LoginPage({ returnTo }: { returnTo?: string }) {
       <section className="flex items-center justify-center p-5 sm:p-10">
         <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-7 shadow-[0_12px_35px_rgba(15,23,42,0.06)]">
           <div className="mb-6 lg:hidden">
-            <div className="flex size-10 items-center justify-center rounded-lg bg-gradient-to-br from-blue-700 to-cyan-500 text-sm font-black text-white">
-              MP
-            </div>
+            <BrandMark className="h-10 w-14" />
           </div>
           <p className="text-[10px] font-bold uppercase tracking-[0.16em] text-blue-700">
             Welcome back

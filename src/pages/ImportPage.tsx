@@ -1,4 +1,4 @@
-import { useMemo, useState, type ChangeEvent } from 'react'
+import { useMemo, useRef, useState, type ChangeEvent, type DragEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import {
   Alert,
@@ -19,13 +19,17 @@ import { useAsyncData } from '../hooks/useAsyncData'
 import {
   IMPORT_FIELDS,
   LEAD_GENERATOR_IMPORT_KEYS,
+  MAX_CSV_IMPORT_ROWS,
   autoMapColumns,
+  downloadText,
+  importReportCsv,
   leadsToExportCsv,
   mapCsvRecord,
+  mappingConflicts,
   parseCsvText,
   resolveOwnerId,
-  downloadText,
   importFieldsForRole,
+  validateCsvFile,
   type ColumnMapping,
   type ParsedCsv,
 } from '../lib/csv'
@@ -119,6 +123,8 @@ export default function ImportPage() {
   const [includeDuplicates, setIncludeDuplicates] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
   const [importing, setImporting] = useState(false)
+  const [dragActive, setDragActive] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const { data, loading, error, refresh } = useAsyncData(async () => {
     const [profiles, duplicateCandidates] = await Promise.all([
       getProfiles(),
@@ -139,6 +145,11 @@ export default function ImportPage() {
   const invalidCount = preview.filter((row) => row.status === 'invalid').length
   const duplicateCount = preview.filter((row) => row.status === 'duplicate').length
   const visibleFields = importFieldsForRole(isFounder)
+  const conflicts = mapping ? mappingConflicts(mapping) : []
+  const mappedCount = mapping
+    ? visibleFields.filter((field) => Boolean(mapping[field.key])).length
+    : 0
+  const currentStep = preview.length ? 3 : parsed ? 2 : 1
 
   if (loading && !data) return <PageLoader label="Preparing CSV tools…" />
   if (error || !data) {
@@ -149,15 +160,21 @@ export default function ImportPage() {
     )
   }
 
-  const handleFile = async (event: ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0]
+  const resetFileState = () => {
     setParsed(null)
     setMapping(null)
     setPreview([])
     setMessage(null)
+    setIncludeDuplicates(false)
+  }
+
+  const handleSelectedFile = async (file?: File) => {
+    resetFileState()
     if (!file) return
     setFileName(file.name)
     try {
+      const fileIssue = validateCsvFile(file)
+      if (fileIssue) throw new Error(fileIssue)
       const next = parseCsvText(await file.text())
       if (!next.headers.length) throw new Error('The CSV does not have a header row.')
       if (!next.rows.length) throw new Error('The CSV does not contain any data rows.')
@@ -172,7 +189,10 @@ export default function ImportPage() {
       }
       setMapping(nextMapping)
       if (next.errors.length) {
-        setMessage({ tone: 'error', text: next.errors.join(' ') })
+        setMessage({
+          tone: 'error',
+          text: `${next.errors.slice(0, 5).join(' ')}${next.errors.length > 5 ? ` ${next.errors.length - 5} more parsing issues were found.` : ''}`,
+        })
       }
     } catch (caught) {
       setMessage({
@@ -182,13 +202,37 @@ export default function ImportPage() {
     }
   }
 
+  const handleFile = (event: ChangeEvent<HTMLInputElement>) => {
+    void handleSelectedFile(event.target.files?.[0])
+  }
+
+  const handleDrop = (event: DragEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    setDragActive(false)
+    void handleSelectedFile(event.dataTransfer.files[0])
+  }
+
   const createPreview = () => {
     if (!parsed || !mapping || !user) return
     setMessage(null)
+    if (parsed.errors.length) {
+      setMessage({
+        tone: 'error',
+        text: 'Fix the CSV parsing issues shown above before validating its rows.',
+      })
+      return
+    }
     if (!mapping.company_name) {
       setMessage({
         tone: 'error',
         text: 'Map the required Company name field before previewing.',
+      })
+      return
+    }
+    if (conflicts.length) {
+      setMessage({
+        tone: 'error',
+        text: `Each CSV column can map to only one CRM field. ${conflicts.join('. ')}.`,
       })
       return
     }
@@ -270,6 +314,7 @@ export default function ImportPage() {
       setMapping(null)
       setPreview([])
       setFileName('')
+      if (fileInputRef.current) fileInputRef.current.value = ''
       await refresh()
     } catch (caught) {
       setMessage({
@@ -312,6 +357,31 @@ export default function ImportPage() {
             : 'Prepare leads in Excel, save as UTF-8 CSV, then validate every row before adding it.'
         }
       />
+      <ol className="grid gap-2 sm:grid-cols-3" aria-label="CSV import progress">
+        {['Upload CSV', 'Map & validate', 'Review & save'].map((label, index) => {
+          const step = index + 1
+          const active = step <= currentStep
+          return (
+            <li
+              key={label}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-xs font-semibold ${
+                active
+                  ? 'border-blue-200 bg-blue-50 text-blue-800'
+                  : 'border-slate-200 bg-white text-slate-500'
+              }`}
+            >
+              <span
+                className={`flex size-5 items-center justify-center rounded-full text-[10px] ${
+                  active ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {step}
+              </span>
+              {label}
+            </li>
+          )
+        })}
+      </ol>
       {message ? <Alert tone={message.tone}>{message.text}</Alert> : null}
 
       <div
@@ -319,16 +389,16 @@ export default function ImportPage() {
           isFounder ? 'grid gap-4 xl:grid-cols-[2fr_1fr]' : 'grid gap-4 xl:grid-cols-1'
         }
       >
-        <Card className="p-5">
+        <Card className="p-4">
           <Badge tone="teal">Import</Badge>
           <h2 className="mt-3 text-base font-bold text-slate-950">Choose a CSV file</h2>
           <p className="mt-1.5 text-xs leading-5 text-slate-500">
             Use the template for fastest setup, or upload another CSV and map its columns
             below.
           </p>
-          <div className="mt-4 flex flex-wrap gap-3">
+          <div className="mt-4 flex flex-wrap gap-2">
             <a
-              className="inline-flex min-h-9 items-center justify-center rounded-md border border-slate-200 bg-white px-3.5 text-xs font-semibold text-slate-700 hover:bg-slate-50"
+              className="inline-flex min-h-8 items-center justify-center rounded-lg border border-blue-200 bg-blue-50 px-3 text-[11px] font-semibold text-blue-800 hover:bg-blue-100"
               href={
                 isFounder
                   ? '/templates/mypath-leads-template.csv'
@@ -336,7 +406,18 @@ export default function ImportPage() {
               }
               download
             >
-              Download Excel-ready CSV template
+              Download example template
+            </a>
+            <a
+              className="inline-flex min-h-8 items-center justify-center rounded-lg border border-slate-200 bg-white px-3 text-[11px] font-semibold text-slate-700 hover:bg-slate-50"
+              href={
+                isFounder
+                  ? '/templates/mypath-leads-blank-template.csv'
+                  : '/templates/mypath-lead-generator-blank-template.csv'
+              }
+              download
+            >
+              Download blank template
             </a>
           </div>
           {!isFounder ? (
@@ -347,22 +428,51 @@ export default function ImportPage() {
               Added.
             </div>
           ) : null}
-          <div className="mt-5">
-            <Field
-              label="CSV file"
-              hint={fileName || 'UTF-8 CSV; up to 1,000 rows recommended'}
+          <div
+            className={`mt-4 rounded-xl border border-dashed p-5 text-center transition ${
+              dragActive
+                ? 'border-blue-500 bg-blue-50'
+                : 'border-slate-300 bg-slate-50/70 hover:border-blue-300'
+            }`}
+            onDragEnter={(event) => {
+              event.preventDefault()
+              setDragActive(true)
+            }}
+            onDragOver={(event) => event.preventDefault()}
+            onDragLeave={() => setDragActive(false)}
+            onDrop={handleDrop}
+          >
+            <p className="text-xs font-semibold text-slate-800">
+              {fileName || 'Drop a CSV here, or choose a file'}
+            </p>
+            <p className="mt-1 text-[11px] text-slate-500">
+              CSV UTF-8 · maximum 5 MB · up to {MAX_CSV_IMPORT_ROWS.toLocaleString()} rows
+            </p>
+            <Button
+              size="sm"
+              variant="secondary"
+              className="mt-3"
+              onClick={() => fileInputRef.current?.click()}
             >
-              <Input
-                type="file"
-                accept=".csv,text/csv"
-                onChange={(event) => void handleFile(event)}
-              />
-            </Field>
+              Choose CSV
+            </Button>
+            <Input
+              ref={fileInputRef}
+              className="sr-only"
+              type="file"
+              accept=".csv,text/csv"
+              onChange={handleFile}
+              aria-label="Choose CSV file"
+            />
           </div>
+          <p className="mt-3 text-[11px] leading-4 text-slate-500">
+            Import creates new leads only. It never overwrites existing leads, and a
+            failed database save rolls back the whole accepted batch.
+          </p>
         </Card>
 
         {isFounder ? (
-          <Card className="p-5">
+          <Card className="p-4">
             <Badge tone="blue">Export</Badge>
             <h2 className="mt-3 text-base font-bold text-slate-950">Export CRM leads</h2>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
@@ -382,7 +492,7 @@ export default function ImportPage() {
       </div>
 
       {parsed && mapping ? (
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <Badge tone="violet">Column mapping</Badge>
@@ -390,12 +500,20 @@ export default function ImportPage() {
                 Match CSV columns to CRM fields
               </h2>
               <p className="mt-1 text-xs text-slate-500">
-                {parsed.rows.length} rows found. Company name is required; unmapped
+                {parsed.rows.length.toLocaleString()} rows · {mappedCount} of{' '}
+                {visibleFields.length} fields mapped. Company name is required; unmapped
                 optional fields remain blank.
               </p>
             </div>
             <Button onClick={createPreview}>Validate and preview</Button>
           </div>
+          {conflicts.length ? (
+            <div className="mt-4">
+              <Alert tone="warning" title="Resolve duplicate mappings">
+                {conflicts.join('. ')}. A source column can map to one CRM field only.
+              </Alert>
+            </div>
+          ) : null}
           <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
             {visibleFields.map((field) => (
               <Field
@@ -426,7 +544,7 @@ export default function ImportPage() {
       ) : null}
 
       {preview.length ? (
-        <Card className="p-5">
+        <Card className="p-4">
           <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h2 className="text-base font-bold text-slate-950">Import preview</h2>
@@ -435,8 +553,20 @@ export default function ImportPage() {
                 {invalidCount} invalid
               </p>
             </div>
-            <div className="flex items-center gap-3">
-              <label className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button
+                size="sm"
+                variant="secondary"
+                onClick={() =>
+                  downloadText(
+                    `mypath-import-report-${dateInputValue()}.csv`,
+                    importReportCsv(preview),
+                  )
+                }
+              >
+                Download row report
+              </Button>
+              <label className="flex items-center gap-2 text-xs text-slate-600">
                 <input
                   type="checkbox"
                   checked={includeDuplicates}
@@ -449,7 +579,7 @@ export default function ImportPage() {
               </Button>
             </div>
           </div>
-          <div className="mt-5">
+          <div className="mt-4">
             <DataTable>
               <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
                 <tr>
@@ -461,7 +591,7 @@ export default function ImportPage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {preview.map((row) => (
+                {preview.slice(0, 250).map((row) => (
                   <tr key={row.line}>
                     <td className="px-4 py-3 text-slate-500">{row.line}</td>
                     <td className="px-4 py-3 font-medium text-slate-900">
@@ -488,6 +618,12 @@ export default function ImportPage() {
                 ))}
               </tbody>
             </DataTable>
+            {preview.length > 250 ? (
+              <p className="mt-2 text-[11px] text-slate-500">
+                Showing the first 250 rows for performance. The downloadable row report
+                includes all {preview.length.toLocaleString()} rows.
+              </p>
+            ) : null}
           </div>
         </Card>
       ) : parsed ? (

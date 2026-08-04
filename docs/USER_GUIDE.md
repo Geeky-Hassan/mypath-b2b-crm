@@ -69,7 +69,11 @@ grouped into Overdue, Today, This week, and Later. The database records creation
 reassignment, and status history.
 
 Deleting a task is Founder-only and permanently removes the task plus its event
-history. In **Settings > Users & access**, Disable is reversible. Remove is
+history. Cancelled and completed work is hidden from the default active view;
+use **Show closed history** when an audit trail is needed. Deleted tasks never
+appear there, and task screens refresh when revisited. Permanently deleting an
+archived lead also removes tasks linked to that lead; archiving alone does not.
+In **Settings > Users & access**, Disable is reversible. Remove is
 permanent: it deletes the member's assigned tasks and targets, reassigns their
 owned leads to the Founder, blocks login, and anonymizes retained lead/activity/
 stage authorship as “Former team member.”
@@ -78,11 +82,13 @@ stage authorship as “Former team member.”
 
 CSV import is available to both roles; export is Founder-only.
 
-1. Download the template from **Import & export**.
+1. Download the example template for guidance or the blank template for clean entry.
 2. Keep the header row and save the file as UTF-8 CSV.
-3. Upload, map columns, and choose **Validate and preview**.
-4. Resolve invalid owners or values. Review duplicate warnings.
-5. Confirm the import. All accepted rows are submitted in one database insert; if that insert fails, no accepted row is saved.
+3. Choose or drag in a `.csv` file (maximum 5 MB and 5,000 rows per batch).
+4. Review automatic column mapping; one source column cannot map to multiple fields.
+5. Choose **Validate and preview**, resolve invalid owners or values, and review duplicate warnings.
+6. Download the row report if changes are needed outside the CRM.
+7. Confirm the import. All accepted rows are submitted in one database insert; if that insert fails, no accepted row is saved.
 
 Lead Generators should use the Excel-ready template and save it as **CSV UTF-8**.
 Only permitted research and qualification fields are mapped; imported leads
