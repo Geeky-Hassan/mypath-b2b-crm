@@ -31,6 +31,8 @@ const profile: Profile = {
   responsibilities: null,
   account_status: 'active',
   must_change_password: false,
+  removed_at: null,
+  removed_by: null,
   created_at: '2026-08-03T00:00:00Z',
   updated_at: '2026-08-03T00:00:00Z',
 }

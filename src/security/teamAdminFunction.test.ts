@@ -37,6 +37,15 @@ describe('team-admin Edge Function contract', () => {
     expect(frontendSources).not.toContain('SUPABASE_SERVICE_ROLE_KEY')
   })
 
+  it('quarantines a removed account and delegates atomic CRM cleanup', () => {
+    expect(edgeFunction).toContain("body.action === 'delete_lead_generator'")
+    expect(edgeFunction).toContain("ban_duration: '876000h'")
+    expect(edgeFunction).toContain("'remove_lead_generator_account'")
+    expect(edgeFunction).toContain('p_removed_by: user.id')
+    expect(edgeFunction).toContain("full_name: 'Former team member'")
+    expect(edgeFunction).not.toContain('deleteUser(target.id)')
+  })
+
   it('returns sanitized password errors and never logs request bodies', () => {
     expect(edgeFunction).not.toContain('console.log')
     expect(edgeFunction).not.toMatch(/json\([^\n]+password: body\.password/)

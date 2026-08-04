@@ -74,10 +74,13 @@ Both roles can import mapped/validated CSV. Lead Generator imports are restricte
 to research and qualification fields and forced to Active at Lead Added; only the
 Founder can export. CSV remains the only spreadsheet exchange.
 
-The Founder creates, resets, disables, and reactivates Lead Generator accounts
+The Founder creates, resets, disables, reactivates, and permanently removes Lead Generator accounts
 through a secured Supabase Edge Function. Founder-set passwords are immediately
 usable and account creation/reset confirms the email server-side. Users are
-disabled rather than deleted when audit ownership must be preserved.
+disabled for reversible pauses. Permanent removal deletes assigned tasks and
+targets, reassigns owned leads to the Founder, blocks the Auth identity, and
+retains only an anonymized profile tombstone when audit ownership must be
+preserved.
 
 ## Out of scope
 

@@ -17,6 +17,7 @@ Apply every migration in filename order through the Supabase SQL Editor or CLI:
 7. `202608030007_stage_context_and_follow_up.sql`
 8. `202608030008_team_operations.sql`
 9. `202608040009_direct_login_account_access.sql`
+10. `202608040010_safe_team_member_removal.sql`
 
 Then deploy the authenticated Edge Function:
 
@@ -64,29 +65,29 @@ New Auth users default to `lead_generator`. The profile update trigger prevents 
 
 After the first Founder is configured, create Lead Generators from **Settings >
 Users & access**. The Founder may create or reset an immediately usable login
-password, disable/reactivate access, and edit work descriptions. Accounts with
-CRM audit ownership are disabled rather than deleted. Additional Founder
-accounts remain a manual Supabase operation.
+password, disable/reactivate access, edit work descriptions, or permanently
+remove a Lead Generator. Additional Founder accounts remain a manual Supabase
+operation.
 
-### Replacing an old test account
+### Removing a team member
 
-Named Lead Generator accounts are not created by migrations or seed data. If an
-old test Auth user already exists, its record lives in Supabase rather than this
-repository:
+Use **Disable** when access might be restored. Use **Remove** only after checking
+the typed-email confirmation and impact summary. Permanent removal:
 
-1. Disable it from **Settings > Users & access** so RLS blocks its existing
-   sessions immediately.
-2. If it has no leads, activities, stage history, targets, tasks, or other audit
-   references, delete it from **Supabase > Authentication > Users**.
-3. If Supabase refuses deletion because CRM records reference the profile, keep
-   it disabled to preserve history. Either reuse it with **Reset password** then
-   **Reactivate**, or remove the associated demonstration records through the
-   CRM before deleting the unused Auth user.
-4. Add the replacement from **Settings > Users & access**. Copy the credentials
-   shown after creation and send them securely; the user can sign in directly.
+1. Quarantines and bans the Supabase Auth login, replaces its email with a
+   reserved tombstone address, and frees the real email for a new account.
+2. Deletes tasks assigned to that member; task-event history cascades with each
+   task.
+3. Deletes that member's targets.
+4. Reassigns currently owned leads to the Founder performing removal.
+5. Hides and anonymizes the person's CRM profile while retaining the UUID as
+   “Former team member” for lead creation, activity, and stage-history audits.
 
-Never delete or rewrite a profile that owns real audit history merely to reuse
-an email address.
+The profile/Auth tombstone is intentionally retained internally. Hard-deleting
+it would either destroy leads and history or break required foreign keys. It has
+no CRM access and is not shown in Users, Team, owner selectors, or targets.
+Database triggers also reject new lead, target, or task assignment to Disabled
+or Removed accounts; existing historical ownership may remain until reassigned.
 
 ## Effective access matrix
 
@@ -125,8 +126,13 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
 - A disabled user cannot select CRM data, even with an older session.
 - A Lead Generator sees only assigned tasks and cannot create, reassign, cancel, delete, or
   edit protected task details through direct Supabase requests.
-- Only a Founder can create/reset/disable/reactivate Lead Generator accounts
+- Only a Founder can create/reset/disable/reactivate/remove Lead Generator accounts
   through `team-admin`; a Lead Generator receives HTTP 403 for admin actions.
+- Deleting a task removes its `task_events`; refresh Team and Tasks and confirm
+  the task no longer contributes to member counts or recent activity.
+- Removing a Lead Generator deletes their assigned tasks/targets, reassigns
+  their owned leads, removes them from Team/User selectors, and blocks the old
+  login. Historical lead/activity/stage actor labels become “Former team member.”
 - A real stage update produces exactly one new history row with the authenticated user and a database timestamp.
 
 ## Data operations
@@ -136,6 +142,9 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
 - Before migrations or bulk imports, take a database backup using the Supabase-supported backup or PostgreSQL dump workflow available for the project.
 - Periodically test a restore into a separate project. A backup is not proven until restoration is verified.
 - Keep Auth users and database data in the same recovery plan; a leads-only CSV cannot reconstruct user IDs or audit ownership.
+- After migration 10 and before bulk import, run the read-only
+  `supabase/verification/pre_import_readiness.sql` query. Resolve all `FAIL`
+  results and review duplicate/disabled-owner `WARNING` results.
 
 ## Incident and access handling
 

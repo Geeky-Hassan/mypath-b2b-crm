@@ -269,7 +269,9 @@ export function resolveOwnerId(
   if (!ownerEmail.trim()) return currentUserId
   return (
     profiles.find(
-      (profile) => profile.email.toLowerCase() === ownerEmail.trim().toLowerCase(),
+      (profile) =>
+        profile.account_status === 'active' &&
+        profile.email.toLowerCase() === ownerEmail.trim().toLowerCase(),
     )?.id ?? null
   )
 }

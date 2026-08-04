@@ -43,7 +43,7 @@ export const ACTIVITY_TYPES = [
   'other',
 ] as const
 export const TARGET_PERIOD_TYPES = ['weekly', 'monthly'] as const
-export const ACCOUNT_STATUSES = ['active', 'disabled'] as const
+export const ACCOUNT_STATUSES = ['active', 'disabled', 'removed'] as const
 export const TASK_STATUSES = ['todo', 'in_progress', 'completed', 'cancelled'] as const
 export const TASK_TYPES = [
   'research',
@@ -87,6 +87,8 @@ export interface Profile {
   responsibilities: string | null
   account_status: AccountStatus
   must_change_password: boolean
+  removed_at: string | null
+  removed_by: string | null
   created_at: string
   updated_at: string
 }

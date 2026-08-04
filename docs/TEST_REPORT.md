@@ -7,8 +7,9 @@ Date: 2026-08-04
 The application is ready for Supabase-backed staging. Static checks,
 unit/component/contract tests, and the production build pass. Production release
 remains conditional on applying all migrations through
-`202608040009_direct_login_account_access.sql`, deploying `team-admin`, and
-completing live Founder/active/disabled checks from [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
+`202608040010_safe_team_member_removal.sql`, deploying `team-admin`, and
+completing live Founder/active/disabled/removal checks from
+[ADMIN_GUIDE.md](ADMIN_GUIDE.md).
 
 ## Automated results
 
@@ -17,7 +18,7 @@ completing live Founder/active/disabled checks from [ADMIN_GUIDE.md](ADMIN_GUIDE
 | Dependency install | Pass   | `npm install` completed with lockfile present                                                                                          |
 | ESLint             | Pass   | Zero lint errors and zero allowed warnings                                                                                             |
 | TypeScript         | Pass   | Project references completed without emit or errors                                                                                    |
-| Vitest             | Pass   | 18 test files, 84 tests passed                                                                                                         |
+| Vitest             | Pass   | 19 test files, 94 tests passed                                                                                                         |
 | Prettier           | Pass   | All checked files match formatting rules                                                                                               |
 | Production build   | Pass   | Vite produced `dist/index.html` and static assets                                                                                      |
 | SPA fallback       | Pass   | Build contains `dist/index.html` and relies on Cloudflare Pages' native SPA fallback; no conflicting catch-all `_redirects` is emitted |
@@ -39,10 +40,21 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Direct Founder-issued password access and account password policy/generation.
 - Login form validation, credential submission, and safe authentication errors.
 - Lead form required-field and successful minimal-create component flows.
+- Founder member-removal component flow, including exact-email confirmation and
+  the sanitized Edge Function request.
 - Static RLS migration contract for authenticated lead access, financial-column isolation, database-enforced Lead Generator boundaries, founder/archive deletion, owner-scoped target reads, founder-only target writes, anonymous revocation, and trigger-owned stage history.
 - Disabled-account data blocking, assigned-task isolation, Founder task administration, and trigger-owned task history contracts.
+- Atomic Founder task deletion, explicit task-event cleanup, repaired cascade,
+  zero-row rejection, and surfaced database failures.
 - Team attribution metrics for lead creator, lead owner, activity actor, stage actor, task assignee, and target progress.
-- Edge Function contract checks for caller revalidation, Founder-only account actions, Lead Generator-only targets, sanitized errors, and frontend service-key exclusion.
+- Edge Function contract checks for caller revalidation, Founder-only account
+  actions, Lead Generator-only targets, account quarantine/removal, sanitized
+  errors, and frontend service-key exclusion.
+- Audit-safe member-removal contract: assigned tasks and targets are deleted,
+  lead ownership is reassigned, personal profile fields are anonymized, and
+  lead/activity/stage provenance is retained.
+- Active-assignee database contracts prevent new leads, targets, or tasks from
+  being assigned to Disabled or Removed accounts.
 - Rerunnable sample-data contract for two stable leads with contextual stage
   history and dated follow-ups.
 - Archive and permanent-delete persistence verifies exactly one affected row so
@@ -63,6 +75,8 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Target writes and settings changes require founder status; target reads remain owner-scoped for Lead Generators.
 - Lead/activity provenance is immutable, settings update actors are database-stamped, and stage history is trigger-owned.
 - Accepted CSV imports are one multi-row database insert, so a database failure rolls back the accepted batch.
+- The import client requests an exact inserted-row count and rejects a response
+  that does not confirm the complete accepted batch.
 - Lead Generators can only update assigned task status/completion note; Founder assignment controls are protected by RLS and a trigger.
 - Auth Admin methods and the service-role key exist only in the Supabase Edge Function. Cloudflare and Vite still require only browser-safe values.
 
@@ -72,12 +86,15 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 
 ## Manual checks still required
 
-- Apply all nine migrations to a non-production Supabase project and deploy `team-admin`.
+- Apply all ten migrations to a non-production Supabase project and deploy `team-admin`.
 - Use real Founder and Lead Generator sessions to execute every RLS check in the administrator guide.
 - Confirm valid/invalid login, refresh restoration, and logout against Supabase Auth.
-- Verify direct-login account creation, password reset, disable, and reactivate with Founder and Lead Generator sessions.
+- Verify direct-login account creation, password reset, disable, reactivate, and
+  permanent removal with Founder and Lead Generator sessions.
 - Execute direct task requests as a Lead Generator to prove create/reassign/delete denials.
 - Confirm stage moves create exactly one history record with the correct actor.
 - Force one CSV constraint failure in staging and confirm the accepted batch remains absent.
+- Run `supabase/verification/pre_import_readiness.sql`; resolve every FAIL and
+  review every duplicate/disabled-owner WARNING before the production import.
 - Perform browser/assistive-technology smoke testing with production-like data.
 - After a later Cloudflare preview deployment, refresh each route and repeat the authorization checks. No deployment was performed in this review.

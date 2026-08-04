@@ -75,8 +75,9 @@ Apply the migrations in filename order using the Supabase SQL Editor or CLI:
 7. `supabase/migrations/202608030007_stage_context_and_follow_up.sql`
 8. `supabase/migrations/202608030008_team_operations.sql`
 9. `supabase/migrations/202608040009_direct_login_account_access.sql`
+10. `supabase/migrations/202608040010_safe_team_member_removal.sql`
 
-Deploy the authenticated account-administration function after migration 9:
+Deploy the authenticated account-administration function after migration 10:
 
 ```bash
 npx supabase login
@@ -114,10 +115,11 @@ Users & access**. The Founder supplies the name, email, work details, and login
 password. The account is email-confirmed server-side and can sign in immediately
 with those credentials; no user-side password change is required.
 
-Existing test Auth users are not stored in this repository. Remove an unused
-one from **Supabase > Authentication > Users** before recreating the same email,
-or reset and reactivate it if CRM history already references that profile. See
-[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md#replacing-an-old-test-account).
+Existing test Auth users are not stored in this repository. Use **Disable** for
+a reversible access pause or **Remove** for permanent, audit-safe removal. The
+Remove flow deletes assigned tasks and targets, reassigns owned leads to the
+Founder, frees the login email, and anonymizes historical authorship. See
+[ADMIN_GUIDE.md](docs/ADMIN_GUIDE.md#removing-a-team-member).
 
 ### Optional sample leads
 
@@ -233,6 +235,13 @@ live Excel synchronization.
 ## Backup and export guidance
 
 CSV export is useful for reporting and portability, but it is not a full backup: activities, stage history, profiles, targets, settings, Auth users, and audit relationships are not included. Before migrations or bulk work, use the backup or PostgreSQL dump workflow supported by the Supabase project. Test restoration into a separate project periodically. See the [administrator guide](docs/ADMIN_GUIDE.md) for the recovery checklist.
+
+Before a large import, apply migration 10, take a Supabase database backup, and
+run [`supabase/verification/pre_import_readiness.sql`](supabase/verification/pre_import_readiness.sql)
+in the SQL Editor. Resolve every `FAIL`; review `WARNING` rows for intentional
+duplicates or disabled owners. The script is read-only. Import preview does not
+write data, and confirmed rows are sent as one counted insert: a constraint or
+policy failure rolls back the complete accepted batch.
 
 ## Cloudflare Pages readiness
 

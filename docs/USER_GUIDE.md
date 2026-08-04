@@ -3,8 +3,8 @@
 ## Start here
 
 Sign in with the email and password supplied by the CRM administrator. A newly
-created or reset account opens **Choose your permanent password** first; CRM data
-stays blocked until that succeeds. There is no public signup or email recovery.
+created or reset account can use that password immediately; no additional
+password-change step is required. There is no public signup or email recovery.
 
 The CRM is a shared workspace. Both users can see leads, activities, and pipeline history. Keep each record factual: leave a field blank when the information is unknown instead of estimating it.
 
@@ -67,6 +67,12 @@ Lead Generators see only assigned tasks and may change To do, In progress, and
 Completed status, plus an optional completion note. Deadlines are date-only and
 grouped into Overdue, Today, This week, and Later. The database records creation,
 reassignment, and status history.
+
+Deleting a task is Founder-only and permanently removes the task plus its event
+history. In **Settings > Users & access**, Disable is reversible. Remove is
+permanent: it deletes the member's assigned tasks and targets, reassigns their
+owned leads to the Founder, blocks login, and anonymizes retained lead/activity/
+stage authorship as “Former team member.”
 
 ## CSV import and export
 

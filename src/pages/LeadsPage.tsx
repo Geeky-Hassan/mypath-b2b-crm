@@ -128,6 +128,9 @@ export function LeadForm({
 }) {
   const [error, setError] = useState<string | null>(null)
   const [duplicateMatches, setDuplicateMatches] = useState<DuplicateMatch[]>([])
+  const assignableProfiles = profiles.filter(
+    (profile) => profile.account_status === 'active' || profile.id === lead?.owner_id,
+  )
   const { toast } = useToast()
   const {
     register,
@@ -305,7 +308,7 @@ export function LeadForm({
         </Field>
         <Field label="Owner" error={errors.owner_id?.message}>
           <Select {...register('owner_id')}>
-            {profiles.map((profile) => (
+            {assignableProfiles.map((profile) => (
               <option key={profile.id} value={profile.id}>
                 {profile.full_name}
               </option>

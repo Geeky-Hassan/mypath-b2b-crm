@@ -302,7 +302,7 @@ export default function TargetsPage() {
                     <span className="text-xs text-slate-400">{displayMonth}</span>
                   </div>
                 </div>
-                {isFounder ? (
+                {isFounder && person.account_status === 'active' ? (
                   <Button
                     variant="secondary"
                     size="sm"
@@ -310,6 +310,8 @@ export default function TargetsPage() {
                   >
                     Add target
                   </Button>
+                ) : person.account_status === 'disabled' ? (
+                  <Badge tone="red">Access disabled</Badge>
                 ) : null}
               </div>
               {targets.length ? (

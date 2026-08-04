@@ -8,6 +8,7 @@ import {
   leadsToExportCsv,
   mapCsvRecord,
   parseCsvText,
+  resolveOwnerId,
 } from './csv'
 
 describe('CSV parsing and mapping', () => {
@@ -69,5 +70,24 @@ describe('CSV parsing and mapping', () => {
       } as never,
     ])
     expect(csv).toContain("'=HYPERLINK")
+  })
+
+  it('does not assign imported leads to a disabled account', () => {
+    const profiles = [
+      {
+        id: 'disabled-user',
+        email: 'disabled@example.com',
+        account_status: 'disabled',
+      },
+      {
+        id: 'active-user',
+        email: 'active@example.com',
+        account_status: 'active',
+      },
+    ] as never
+
+    expect(resolveOwnerId('disabled@example.com', profiles, 'founder')).toBeNull()
+    expect(resolveOwnerId('active@example.com', profiles, 'founder')).toBe('active-user')
+    expect(resolveOwnerId('', profiles, 'founder')).toBe('founder')
   })
 })

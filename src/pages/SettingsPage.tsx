@@ -58,6 +58,8 @@ export default function SettingsPage() {
   const [createOpen, setCreateOpen] = useState(false)
   const [editProfile, setEditProfile] = useState<Profile | null>(null)
   const [resetProfile, setResetProfile] = useState<Profile | null>(null)
+  const [removeProfile, setRemoveProfile] = useState<Profile | null>(null)
+  const [removeConfirmation, setRemoveConfirmation] = useState('')
   const [temporaryPassword, setTemporaryPassword] = useState('')
   const [createdCredentials, setCreatedCredentials] = useState<{
     fullName: string
@@ -157,6 +159,11 @@ export default function SettingsPage() {
             setResetProfile(profile)
           }}
           onStatus={(profile) => void runStatusChange(profile)}
+          onRemove={(profile) => {
+            setActionError(null)
+            setRemoveConfirmation('')
+            setRemoveProfile(profile)
+          }}
         />
       )}
 
@@ -315,6 +322,96 @@ export default function SettingsPage() {
           )
         ) : null}
       </Modal>
+      <Modal
+        open={Boolean(removeProfile)}
+        onClose={() => {
+          if (accountBusy) return
+          setRemoveProfile(null)
+          setRemoveConfirmation('')
+        }}
+        title="Permanently remove team member"
+        description="This removes access and active workload while keeping anonymized audit history accurate."
+        size="md"
+      >
+        {removeProfile ? (
+          <div className="space-y-4">
+            {actionError ? <Alert tone="error">{actionError}</Alert> : null}
+            <Alert tone="warning" title="This cannot be undone">
+              <ul className="list-disc space-y-1 pl-5">
+                <li>Deletes every task assigned to this member and its event history.</li>
+                <li>Deletes all of this member's targets.</li>
+                <li>Reassigns their currently owned leads to the Founder.</li>
+                <li>Blocks sign-in and removes their personal profile details.</li>
+                <li>
+                  Keeps anonymized lead, activity, and stage authorship so CRM history is
+                  not falsified.
+                </li>
+              </ul>
+            </Alert>
+            <Field
+              label={`Type ${removeProfile.email} to confirm`}
+              hint="The email must match exactly."
+              required
+            >
+              <Input
+                autoFocus
+                autoComplete="off"
+                value={removeConfirmation}
+                onChange={(event) => setRemoveConfirmation(event.target.value)}
+              />
+            </Field>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button
+                variant="secondary"
+                disabled={Boolean(accountBusy)}
+                onClick={() => {
+                  setRemoveProfile(null)
+                  setRemoveConfirmation('')
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                variant="danger"
+                loading={accountBusy === removeProfile.id}
+                disabled={removeConfirmation.trim() !== removeProfile.email}
+                onClick={async () => {
+                  setAccountBusy(removeProfile.id)
+                  setActionError(null)
+                  try {
+                    const response = await runTeamAdminAction({
+                      action: 'delete_lead_generator',
+                      user_id: removeProfile.id,
+                    })
+                    const cleanup = (response.cleanup ?? {}) as Record<string, unknown>
+                    const tasks = Number(cleanup.tasks_deleted ?? 0)
+                    const targets = Number(cleanup.targets_deleted ?? 0)
+                    const leads = Number(cleanup.leads_reassigned ?? 0)
+                    toast({
+                      title: 'Team member permanently removed.',
+                      description: `${tasks} task(s) and ${targets} target(s) deleted; ${leads} lead(s) reassigned.`,
+                      tone: 'success',
+                    })
+                    setRemoveProfile(null)
+                    setRemoveConfirmation('')
+                    await refresh()
+                  } catch (caught) {
+                    setActionError(
+                      caught instanceof Error
+                        ? caught.message
+                        : 'The team member could not be removed.',
+                    )
+                  } finally {
+                    setAccountBusy(null)
+                  }
+                }}
+              >
+                Remove member permanently
+              </Button>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
     </div>
   )
 }
@@ -329,6 +426,7 @@ function GeneralSettings({
   refresh: () => Promise<void>
 }) {
   const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -351,11 +449,25 @@ function GeneralSettings({
         <form
           className="mt-5 space-y-4"
           onSubmit={handleSubmit(async (values) => {
-            await saveSettings(values.organization_name, values.default_currency, userId)
-            toast({ title: 'CRM settings saved.', tone: 'success' })
-            await refresh()
+            setError(null)
+            try {
+              await saveSettings(
+                values.organization_name,
+                values.default_currency,
+                userId,
+              )
+              toast({ title: 'CRM settings saved.', tone: 'success' })
+              await refresh()
+            } catch (caught) {
+              setError(
+                caught instanceof Error
+                  ? caught.message
+                  : 'CRM settings could not be saved.',
+              )
+            }
           })}
         >
+          {error ? <Alert tone="error">{error}</Alert> : null}
           <Field
             label="Organization name"
             error={errors.organization_name?.message}
@@ -404,6 +516,7 @@ function UsersAccess({
   onEdit,
   onReset,
   onStatus,
+  onRemove,
 }: {
   profiles: Profile[]
   busy: string | null
@@ -411,6 +524,7 @@ function UsersAccess({
   onEdit: (profile: Profile) => void
   onReset: (profile: Profile) => void
   onStatus: (profile: Profile) => void
+  onRemove: (profile: Profile) => void
 }) {
   return (
     <Card className="p-5">
@@ -482,6 +596,14 @@ function UsersAccess({
                         >
                           {profile.account_status === 'active' ? 'Disable' : 'Reactivate'}
                         </Button>
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          disabled={Boolean(busy)}
+                          onClick={() => onRemove(profile)}
+                        >
+                          Remove
+                        </Button>
                       </>
                     ) : null}
                   </div>
@@ -493,8 +615,9 @@ function UsersAccess({
       </div>
       <Alert tone="info" title="Account safety">
         <p>
-          Users are disabled, not deleted, so lead, task, activity, and history ownership
-          remains intact. No service-role key is used by the browser.
+          Disable access for a reversible pause. Permanent removal deletes assigned tasks
+          and targets, reassigns owned leads, and anonymizes audit ownership. No
+          service-role key is used by the browser.
         </p>
       </Alert>
     </Card>
@@ -655,6 +778,7 @@ function WorkDetailsForm({
   onCancel: () => void
   onSaved: () => Promise<void>
 }) {
+  const [error, setError] = useState<string | null>(null)
   const {
     register,
     handleSubmit,
@@ -671,10 +795,18 @@ function WorkDetailsForm({
     <form
       className="space-y-4"
       onSubmit={handleSubmit(async (values) => {
-        await updateProfileWorkDetails(profile.id, values)
-        await onSaved()
+        setError(null)
+        try {
+          await updateProfileWorkDetails(profile.id, values)
+          await onSaved()
+        } catch (caught) {
+          setError(
+            caught instanceof Error ? caught.message : 'The profile could not be saved.',
+          )
+        }
       })}
     >
+      {error ? <Alert tone="error">{error}</Alert> : null}
       <Field label="Full name" required error={errors.full_name?.message}>
         <Input {...register('full_name')} />
       </Field>

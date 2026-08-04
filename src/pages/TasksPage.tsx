@@ -98,6 +98,7 @@ function TaskEditor({
   onClose: () => void
 }) {
   const { toast } = useToast()
+  const [error, setError] = useState<string | null>(null)
   const activeProfiles = profiles.filter((profile) => profile.account_status === 'active')
   const {
     register,
@@ -109,14 +110,20 @@ function TaskEditor({
   })
 
   const submit = async (values: TaskValues) => {
-    await saveTask({ ...values, assigned_by: userId } as TaskInput, task?.id)
-    toast({ title: task ? 'Task updated.' : 'Task assigned.', tone: 'success' })
-    await onSaved()
-    onClose()
+    setError(null)
+    try {
+      await saveTask({ ...values, assigned_by: userId } as TaskInput, task?.id)
+      toast({ title: task ? 'Task updated.' : 'Task assigned.', tone: 'success' })
+      await onSaved()
+      onClose()
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The task could not be saved.')
+    }
   }
 
   return (
     <form className="space-y-4" onSubmit={handleSubmit(submit)}>
+      {error ? <Alert tone="error">{error}</Alert> : null}
       <Field label="Task title" required error={errors.title?.message}>
         <Input autoFocus {...register('title')} />
       </Field>
@@ -207,6 +214,7 @@ export default function TasksPage() {
   const [nextStatus, setNextStatus] = useState<TaskStatus>('in_progress')
   const [completionNote, setCompletionNote] = useState('')
   const [savingStatus, setSavingStatus] = useState(false)
+  const [deletingTask, setDeletingTask] = useState(false)
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState<TaskStatus | 'all'>('all')
   const [assignee, setAssignee] = useState('')
@@ -582,12 +590,24 @@ export default function TasksPage() {
               <div className="border-t border-red-100 pt-4">
                 <Button
                   variant="danger"
+                  loading={deletingTask}
                   onClick={async () => {
                     if (!window.confirm('Delete this task and its event history?')) return
-                    await deleteTask(selected.id)
-                    toast({ title: 'Task deleted.', tone: 'success' })
-                    setSelected(null)
-                    await refresh()
+                    setDeletingTask(true)
+                    try {
+                      await deleteTask(selected.id)
+                      toast({ title: 'Task and history deleted.', tone: 'success' })
+                      setSelected(null)
+                      await refresh()
+                    } catch (caught) {
+                      toast({
+                        title: 'Task could not be deleted.',
+                        description: caught instanceof Error ? caught.message : undefined,
+                        tone: 'error',
+                      })
+                    } finally {
+                      setDeletingTask(false)
+                    }
                   }}
                 >
                   Delete task

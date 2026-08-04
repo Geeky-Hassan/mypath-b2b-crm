@@ -47,6 +47,15 @@ login credentials. The Edge Function confirms email on create, password reset,
 and reactivation, while RLS continues to make account status the immediate data
 access boundary.
 
+Migration `202608040010_safe_team_member_removal.sql` repairs the task-event
+cascade and adds an atomic Founder-only task deletion function. Its
+service-role-only account cleanup transaction deletes assigned tasks and
+targets, reassigns lead ownership, and replaces the member profile with a
+non-accessible anonymized audit tombstone. Lead creation, activity, and stage
+actors are deliberately preserved instead of deleted or attributed to another
+person. Companion triggers reject any new lead, target, or task assignment to a
+Disabled or Removed profile, including direct API requests.
+
 ## Pipeline mutation and provenance
 
 The board loads the shared lead graph once, then filters locally. On drop, the UI checks explicit stage requirements and displays non-blocking completeness warnings. Every move requires a stage description and may attach a dated follow-up; entering Follow-up Required automatically requires the date. A single transactional function can set proposed value and stage together. PostgreSQL triggers synchronize Won lifecycle and append `stage_history` with the authenticated actor, database timestamp, description, and follow-up data. Clients have no direct stage-history write grant.
@@ -73,7 +82,12 @@ caller, requires an Active Founder for administrative actions, targets only Lead
 Generator accounts, and uses a server-only service-role client. It never returns
 or logs passwords. Its service key is not a Vite or Cloudflare variable.
 
-CSV preview and validation happen in the browser, but accepted imports are persisted with one multi-row PostgREST insert. PostgreSQL executes that statement transactionally: if any accepted row fails a policy or constraint, none of the accepted rows are committed.
+For permanent removal, the function first quarantines the Auth identity. It then
+invokes the service-role-only cleanup transaction and restores the Auth identity
+if that transaction fails. A removed account remains banned and its email is
+replaced, while RLS independently rejects its non-Active profile.
+
+CSV preview and validation happen in the browser, but accepted imports are persisted with one counted multi-row PostgREST insert. PostgreSQL executes that statement transactionally: if any accepted row fails a policy or constraint, none of the accepted rows are committed, and the client also rejects a response that does not confirm the full expected row count.
 
 ## Verification surface
 

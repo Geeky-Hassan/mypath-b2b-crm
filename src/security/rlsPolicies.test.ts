@@ -48,6 +48,17 @@ const directLoginAccess = readFileSync(
   ),
   'utf8',
 )
+const safeRemoval = readFileSync(
+  new URL(
+    '../../supabase/migrations/202608040010_safe_team_member_removal.sql',
+    import.meta.url,
+  ),
+  'utf8',
+)
+const preImportReadiness = readFileSync(
+  new URL('../../supabase/verification/pre_import_readiness.sql', import.meta.url),
+  'utf8',
+)
 const sampleSeed = readFileSync(
   new URL('../../supabase/seed.sql', import.meta.url),
   'utf8',
@@ -206,5 +217,63 @@ describe('RLS migration contract', () => {
     expect(teamOperations).toMatch(
       /when \(select private\.is_founder\(\)\) then l\.proposed_value/,
     )
+  })
+
+  it('deletes tasks and task events transactionally for the Founder only', () => {
+    expect(safeRemoval).toContain('create or replace function public.delete_crm_task')
+    expect(safeRemoval).toContain(
+      "message = 'Only the Founder can permanently delete tasks'",
+    )
+    expect(safeRemoval).toMatch(
+      /delete from public\.task_events where task_id = p_task_id;[\s\S]*delete from public\.crm_tasks where id = p_task_id;/,
+    )
+    expect(safeRemoval).toContain('on delete cascade')
+    expect(safeRemoval).toContain(
+      'grant execute on function public.delete_crm_task(uuid) to authenticated',
+    )
+  })
+
+  it('removes team workload without deleting or falsifying lead audit history', () => {
+    expect(safeRemoval).toContain(
+      'create or replace function public.remove_lead_generator_account',
+    )
+    expect(safeRemoval).toContain(
+      'delete from public.crm_tasks where assigned_to = p_user_id',
+    )
+    expect(safeRemoval).toContain('delete from public.targets where user_id = p_user_id')
+    expect(safeRemoval).toMatch(
+      /update public\.leads[\s\S]*set owner_id = p_removed_by[\s\S]*where owner_id = p_user_id/,
+    )
+    expect(safeRemoval).toContain("full_name = 'Former team member'")
+    expect(safeRemoval).toContain("account_status = 'removed'")
+    expect(safeRemoval).not.toMatch(/delete from public\.leads/)
+    expect(safeRemoval).not.toMatch(/delete from public\.lead_activities/)
+    expect(safeRemoval).not.toMatch(/delete from public\.stage_history/)
+    expect(safeRemoval).toContain('to service_role')
+    expect(safeRemoval).toContain('from public, anon, authenticated')
+  })
+
+  it('prevents assigning new records to disabled or removed accounts', () => {
+    expect(safeRemoval).toContain('public.require_active_lead_owner()')
+    expect(safeRemoval).toContain('public.require_active_target_user()')
+    expect(safeRemoval).toContain('public.require_active_task_assignee()')
+    expect(safeRemoval).toContain("message = 'Lead owner must have active CRM access'")
+    expect(safeRemoval).toContain("message = 'Target user must have active CRM access'")
+    expect(safeRemoval).toContain("message = 'Task assignee must have active CRM access'")
+    expect(
+      safeRemoval.match(/from public, anon, authenticated;/g)?.length,
+    ).toBeGreaterThanOrEqual(4)
+  })
+
+  it('provides read-only pre-import data-integrity and security checks', () => {
+    expect(preImportReadiness).toContain("'task_event_cascade'")
+    expect(preImportReadiness).toContain("'rls_policy_whitelist'")
+    expect(preImportReadiness).toContain("'lead_stage_history_alignment'")
+    expect(preImportReadiness).toContain("'duplicate_contact_emails'")
+    expect(preImportReadiness).toContain("'duplicate_websites'")
+    expect(preImportReadiness).not.toMatch(/\bdelete\s+from\b/i)
+    expect(preImportReadiness).not.toMatch(/\bupdate\s+public\./i)
+    expect(preImportReadiness).not.toMatch(/\binsert\s+into\b/i)
+    expect(preImportReadiness).not.toMatch(/\balter\s+table\b/i)
   })
 })

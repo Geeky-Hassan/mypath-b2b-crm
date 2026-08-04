@@ -15,6 +15,7 @@ vi.mock('../lib/supabase', () => ({
 }))
 
 import {
+  deleteTask,
   importLeadRows,
   moveLeadStage,
   permanentlyDeleteLead,
@@ -42,7 +43,7 @@ describe('transactional CSV persistence', () => {
   })
 
   it('submits the full import in one database insert', async () => {
-    supabaseMocks.insert.mockResolvedValue({ error: null })
+    supabaseMocks.insert.mockResolvedValue({ error: null, count: 2 })
 
     await expect(
       importLeadRows([lead, { ...lead, company_name: 'Second School' }], 'user-1'),
@@ -51,18 +52,21 @@ describe('transactional CSV persistence', () => {
     expect(supabaseMocks.from).toHaveBeenCalledTimes(1)
     expect(supabaseMocks.from).toHaveBeenCalledWith('leads')
     expect(supabaseMocks.insert).toHaveBeenCalledTimes(1)
-    expect(supabaseMocks.insert).toHaveBeenCalledWith([
-      expect.objectContaining({
-        company_name: 'Northstar Learning',
-        website: null,
-        email: 'contact@example.com',
-        created_by: 'user-1',
-      }),
-      expect.objectContaining({
-        company_name: 'Second School',
-        created_by: 'user-1',
-      }),
-    ])
+    expect(supabaseMocks.insert).toHaveBeenCalledWith(
+      [
+        expect.objectContaining({
+          company_name: 'Northstar Learning',
+          website: null,
+          email: 'contact@example.com',
+          created_by: 'user-1',
+        }),
+        expect.objectContaining({
+          company_name: 'Second School',
+          created_by: 'user-1',
+        }),
+      ],
+      { count: 'exact' },
+    )
   })
 
   it('reports a failed batch as importing no rows', async () => {
@@ -73,13 +77,21 @@ describe('transactional CSV persistence', () => {
     )
   })
 
+  it('rejects success when the database does not confirm every row', async () => {
+    supabaseMocks.insert.mockResolvedValue({ error: null, count: 1 })
+
+    await expect(
+      importLeadRows([lead, { ...lead, company_name: 'Second School' }], 'user-1'),
+    ).rejects.toThrow('did not confirm the full batch')
+  })
+
   it('does not call Supabase for an empty import', async () => {
     await expect(importLeadRows([], 'user-1')).resolves.toBe(0)
     expect(supabaseMocks.from).not.toHaveBeenCalled()
   })
 
   it('strips founder-only fields from a Lead Generator import payload', async () => {
-    supabaseMocks.insert.mockResolvedValue({ error: null })
+    supabaseMocks.insert.mockResolvedValue({ error: null, count: 1 })
     await importLeadRows(
       [
         {
@@ -99,6 +111,33 @@ describe('transactional CSV persistence', () => {
     expect(payload).not.toHaveProperty('lifecycle_status')
     expect(payload).not.toHaveProperty('proposed_value')
     expect(payload).not.toHaveProperty('expected_close_date')
+  })
+})
+
+describe('transactional task deletion', () => {
+  beforeEach(() => {
+    supabaseMocks.rpc.mockReset()
+  })
+
+  it('uses the database cleanup function and requires one deleted task', async () => {
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: 1, error: null })
+    await expect(deleteTask('task-1')).resolves.toBeUndefined()
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith('delete_crm_task', {
+      p_task_id: 'task-1',
+    })
+
+    supabaseMocks.rpc.mockResolvedValueOnce({ data: 0, error: null })
+    await expect(deleteTask('task-missing')).rejects.toThrow('already removed')
+  })
+
+  it('surfaces a database deletion failure', async () => {
+    supabaseMocks.rpc.mockResolvedValue({
+      data: null,
+      error: { message: 'permission denied' },
+    })
+    await expect(deleteTask('task-1')).rejects.toEqual({
+      message: 'permission denied',
+    })
   })
 })
 

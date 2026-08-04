@@ -116,6 +116,7 @@ export async function getProfiles(): Promise<Profile[]> {
   const { data, error } = await getSupabase()
     .from('profiles')
     .select('*')
+    .in('account_status', ['active', 'disabled'])
     .order('full_name')
   if (error) throw error
   return (data ?? []) as Profile[]
@@ -213,8 +214,12 @@ export async function saveLead(
   const payload = leadPayload(input, isFounder)
 
   if (leadId) {
-    const { error } = await getSupabase().from('leads').update(payload).eq('id', leadId)
+    const { error, count } = await getSupabase()
+      .from('leads')
+      .update(payload, { count: 'exact' })
+      .eq('id', leadId)
     if (error) throw error
+    if (count !== 1) throw new Error('The lead was not updated. Refresh and try again.')
     return leadId
   }
 
@@ -251,11 +256,13 @@ export async function addActivity(
 }
 
 export async function deleteActivity(activityId: string): Promise<void> {
-  const { error } = await getSupabase()
+  const { error, count } = await getSupabase()
     .from('lead_activities')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', activityId)
   if (error) throw error
+  if (count !== 1)
+    throw new Error('The activity was not deleted or is no longer editable.')
 }
 
 export async function moveLeadStage(
@@ -280,11 +287,15 @@ export async function moveLeadStage(
 }
 
 export async function markLeadLost(leadId: string, lostReason: string): Promise<void> {
-  const { error } = await getSupabase()
+  const { error, count } = await getSupabase()
     .from('leads')
-    .update({ lifecycle_status: 'lost', lost_reason: lostReason.trim() })
+    .update(
+      { lifecycle_status: 'lost', lost_reason: lostReason.trim() },
+      { count: 'exact' },
+    )
     .eq('id', leadId)
   if (error) throw error
+  if (count !== 1) throw new Error('The lead was not marked lost. Refresh and try again.')
 }
 
 export async function setLeadArchived(leadId: string, archived: boolean): Promise<void> {
@@ -380,9 +391,17 @@ export async function saveTask(values: TaskInput, taskId?: string): Promise<void
     due_date: values.due_date,
     completion_note: optional(values.completion_note),
   }
-  const { error } = taskId
-    ? await getSupabase().from('crm_tasks').update(payload).eq('id', taskId)
-    : await getSupabase().from('crm_tasks').insert(payload)
+  if (taskId) {
+    const { error, count } = await getSupabase()
+      .from('crm_tasks')
+      .update(payload, { count: 'exact' })
+      .eq('id', taskId)
+    if (error) throw error
+    if (count !== 1) throw new Error('The task was not updated. Refresh and try again.')
+    return
+  }
+
+  const { error } = await getSupabase().from('crm_tasks').insert(payload)
   if (error) throw error
 }
 
@@ -400,27 +419,30 @@ export async function updateTaskStatus(
 }
 
 export async function deleteTask(taskId: string): Promise<void> {
-  const { error, count } = await getSupabase()
-    .from('crm_tasks')
-    .delete({ count: 'exact' })
-    .eq('id', taskId)
+  const { data, error } = await getSupabase().rpc('delete_crm_task', {
+    p_task_id: taskId,
+  })
   if (error) throw error
-  if (count !== 1) throw new Error('The task was not deleted.')
+  if (data !== 1) throw new Error('The task was not deleted or was already removed.')
 }
 
 export async function updateProfileWorkDetails(
   profileId: string,
   values: { full_name: string; job_title?: string; responsibilities?: string },
 ): Promise<void> {
-  const { error } = await getSupabase()
+  const { error, count } = await getSupabase()
     .from('profiles')
-    .update({
-      full_name: values.full_name.trim(),
-      job_title: optional(values.job_title),
-      responsibilities: optional(values.responsibilities),
-    })
+    .update(
+      {
+        full_name: values.full_name.trim(),
+        job_title: optional(values.job_title),
+        responsibilities: optional(values.responsibilities),
+      },
+      { count: 'exact' },
+    )
     .eq('id', profileId)
   if (error) throw error
+  if (count !== 1) throw new Error('The work profile was not updated.')
 }
 
 export type TeamAdminRequest =
@@ -438,6 +460,7 @@ export type TeamAdminRequest =
       user_id: string
       account_status: 'active' | 'disabled'
     }
+  | { action: 'delete_lead_generator'; user_id: string }
   | { action: 'change_own_password'; password: string }
 
 export async function runTeamAdminAction(
@@ -481,9 +504,17 @@ export async function saveTarget(values: {
     target_type: values.target_type.trim(),
     target_value: values.target_value,
   }
-  const { error } = values.id
-    ? await getSupabase().from('targets').update(payload).eq('id', values.id)
-    : await getSupabase().from('targets').insert(payload)
+  if (values.id) {
+    const { error, count } = await getSupabase()
+      .from('targets')
+      .update(payload, { count: 'exact' })
+      .eq('id', values.id)
+    if (error) throw error
+    if (count !== 1) throw new Error('The target was not updated.')
+    return
+  }
+
+  const { error } = await getSupabase().from('targets').insert(payload)
   if (error) throw error
 }
 
@@ -516,15 +547,27 @@ export async function saveSalesCostPeriod(values: {
     notes: optional(values.notes),
     created_by: values.created_by,
   }
-  const { error } = values.id
-    ? await getSupabase().from('sales_costs').update(payload).eq('id', values.id)
-    : await getSupabase().from('sales_costs').insert(payload)
+  if (values.id) {
+    const { error, count } = await getSupabase()
+      .from('sales_costs')
+      .update(payload, { count: 'exact' })
+      .eq('id', values.id)
+    if (error) throw error
+    if (count !== 1) throw new Error('The sales-cost period was not updated.')
+    return
+  }
+
+  const { error } = await getSupabase().from('sales_costs').insert(payload)
   if (error) throw error
 }
 
 export async function deleteTarget(targetId: string): Promise<void> {
-  const { error } = await getSupabase().from('targets').delete().eq('id', targetId)
+  const { error, count } = await getSupabase()
+    .from('targets')
+    .delete({ count: 'exact' })
+    .eq('id', targetId)
   if (error) throw error
+  if (count !== 1) throw new Error('The target was not deleted.')
 }
 
 export async function getSettings(): Promise<CrmSettings> {
@@ -538,15 +581,19 @@ export async function saveSettings(
   defaultCurrency: string,
   userId: string,
 ): Promise<void> {
-  const { error } = await getSupabase()
+  const { error, count } = await getSupabase()
     .from('crm_settings')
-    .update({
-      organization_name: organizationName.trim(),
-      default_currency: defaultCurrency.trim().toUpperCase(),
-      updated_by: userId,
-    })
+    .update(
+      {
+        organization_name: organizationName.trim(),
+        default_currency: defaultCurrency.trim().toUpperCase(),
+        updated_by: userId,
+      },
+      { count: 'exact' },
+    )
     .eq('id', true)
   if (error) throw error
+  if (count !== 1) throw new Error('CRM settings were not updated.')
 }
 
 export async function importLeadRows(
@@ -559,9 +606,14 @@ export async function importLeadRows(
     ...leadPayload(input, isFounder),
     created_by: currentUserId,
   }))
-  const { error } = await getSupabase().from('leads').insert(payloads)
+  const { error, count } = await getSupabase()
+    .from('leads')
+    .insert(payloads, { count: 'exact' })
   if (error) {
     throw new Error(`No rows were imported: ${error.message}`, { cause: error })
+  }
+  if (count !== payloads.length) {
+    throw new Error('No rows were imported: the database did not confirm the full batch.')
   }
   return payloads.length
 }
