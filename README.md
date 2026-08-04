@@ -60,7 +60,7 @@ npm run build
 npm run preview
 ```
 
-`npm run preview` serves the production build, normally at `http://localhost:4173`. Live authentication and RLS can only be proven against a configured Supabase project; the SQL Editor runs as an elevated database role and must not be used as the RLS test client.
+`npm run preview` serves the production build, normally at `http://localhost:4173`. Live authentication and RLS can only be proven against a configured Supabase project; the SQL Editor runs as an elevated database role and must not be used as the RLS test client...
 
 ## Supabase setup
 
