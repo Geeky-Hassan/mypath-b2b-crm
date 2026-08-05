@@ -1,6 +1,6 @@
 # MyPath B2B CRM
 
-An internal, desktop-first CRM for MyPath. The Founder and authorised Lead Generators share lead, contact, qualification, activity, and pipeline data, with Supabase Row Level Security enforcing authenticated access and founder-only permanent deletion.
+An internal, desktop-first CRM for MyPath. The Founder and authorised Lead Generators share lead, contact, qualification, activity, and pipeline data, with Supabase Row Level Security enforcing authenticated access and safeguarded permanent deletion.
 
 ## Stack
 
@@ -43,7 +43,7 @@ Never place a service-role key in this application or commit a real `.env` file.
 
 After Supabase setup, run `npm run dev`, open the printed `http://localhost:5173` URL, and test with both accounts:
 
-1. Sign in as a Lead Generator created from **Settings > Users & access**, review **My focus**, add a lead with an optional international phone, bulk-import a small CSV, complete an assigned task, and move Lead Added to Qualified. Confirm deal values, export, archive/delete, Team, and Settings are unavailable.
+1. Sign in as a Lead Generator created from **Settings > Users & access**, review **My focus**, add a lead with an optional international phone and next action, bulk-import a small CSV, complete an assigned task, move Lead Added to Qualified, and exercise the safeguarded archive-confirm-delete flow. Confirm deal values, export, Team, and Settings remain unavailable.
 2. Sign in as Noor, add contact activity and a next action, move the lead through later stages, enter a proposed value for proposal/negotiation, mark a test lead lost with a reason, and archive/restore/delete an archived test lead.
 3. Create one weekly and one monthly target; confirm the Lead Generator sees only personal targets and Noor sees both users.
 4. Import a small template CSV, review mapping/invalid/duplicate states, export the filtered Leads view, and open the CSV in a spreadsheet.
@@ -77,8 +77,9 @@ Apply the migrations in filename order using the Supabase SQL Editor or CLI:
 9. `supabase/migrations/202608040009_direct_login_account_access.sql`
 10. `supabase/migrations/202608040010_safe_team_member_removal.sql`
 11. `supabase/migrations/202608040011_task_assignment_consistency.sql`
+12. `supabase/migrations/202608050012_reliability_and_lead_workflow.sql`
 
-Deploy the authenticated account-administration function after applying all 11 migrations:
+Deploy the authenticated account-administration function after applying all 12 migrations:
 
 ```bash
 npx supabase login
@@ -187,17 +188,18 @@ Founder:
 
 Lead Generator:
 
-- Creates and edits shared company, contact, qualification, owner, notes, and activity data.
+- Creates and edits shared company, contact, qualification, owner, next-action, notes, and activity data.
 - Views the shared pipeline and may move only Lead Added to Qualified.
 - Imports CSV leads, manages assigned task status, and sees personal targets;
-  cannot export, view deal values, archive/delete leads, or access founder-only routes.
+  cannot export, view deal values, or access founder-only routes.
+- Can delete any shared lead only through archive-first and exact-name confirmation.
 
 Founder-created and Founder-reset passwords are immediately usable login
 passwords. Disabled accounts receive no CRM data access even if an older JWT
 remains valid; reactivation restores access without requiring another password
 change.
 
-The founder dashboard, sales contact/follow-up fields, lifecycle controls, deal values, archive actions, sales-cost entry, and expected-close input are founder-specific. Migration `202608030005_role_boundaries_and_quality.sql` enforces these boundaries in PostgreSQL as well as the UI and exposes a role-aware read projection that returns financial fields only to the founder.
+The founder dashboard, sales contact timestamps, lifecycle controls outside deletion preparation, deal values, standalone archive actions, sales-cost entry, and expected-close input are founder-specific. Migration `202608050012_reliability_and_lead_workflow.sql` allows Lead Generator next-action maintenance and safeguarded deletion while retaining those boundaries in PostgreSQL.
 
 ## Sales funnel
 
@@ -232,14 +234,14 @@ next_action, next_action_date, demo_date, proposed_value,
 expected_close_date, lost_reason, notes
 ```
 
-`company_name` is required. Blank owner email defaults to the importing user. Enum values must use the database forms documented by the template: priority `low|medium|high`, source `email|linkedin|referral|event|other`, lifecycle `active|nurture|won|lost|archived`, and one of the detailed pipeline values documented in `docs/PRODUCT_SPEC.md`.
+`company_name` is required. Qualification score is a whole number from `0` to `11`. Blank owner email defaults to the importing user. Enum values must use the database forms documented by the template: priority `low|medium|high`, source `email|linkedin|google|ai|referral|event|other`, lifecycle `active|nurture|won|lost|archived`, and one of the detailed pipeline values documented in `docs/PRODUCT_SPEC.md`.
 
 The Lead Generator template is
 [`public/templates/mypath-lead-generator-template.csv`](public/templates/mypath-lead-generator-template.csv).
 An example-free version is available at
 [`public/templates/mypath-lead-generator-blank-template.csv`](public/templates/mypath-lead-generator-blank-template.csv).
 Open it in Excel and save as **CSV UTF-8** before upload. Lead Generator imports
-accept only permitted research, contact, qualification, owner, date, and notes
+accept only permitted research, contact, qualification, owner, next-action, date, and notes
 fields, and always create Active records at Lead Added. Forbidden columns are
 stripped even if manually supplied. Filtered/full export remains Founder-only.
 CSV is the only spreadsheet exchange in V1—there is no native `.xlsx` parsing or
@@ -249,7 +251,7 @@ live Excel synchronization.
 
 CSV export is useful for reporting and portability, but it is not a full backup: activities, stage history, profiles, targets, settings, Auth users, and audit relationships are not included. Before migrations or bulk work, use the backup or PostgreSQL dump workflow supported by the Supabase project. Test restoration into a separate project periodically. See the [administrator guide](docs/ADMIN_GUIDE.md) for the recovery checklist.
 
-Before a large import, apply migration 11, take a Supabase database backup, and
+Before a large import, apply migration 12, take a Supabase database backup, and
 run [`supabase/verification/pre_import_readiness.sql`](supabase/verification/pre_import_readiness.sql)
 in the SQL Editor. Resolve every `FAIL`; review `WARNING` rows for intentional
 duplicates or disabled owners. The script is read-only. Import preview does not

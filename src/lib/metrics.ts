@@ -10,6 +10,7 @@ import {
   type Target,
   type TargetType,
 } from '../types/domain'
+export { missingLeadInformation } from './leadReadiness'
 
 const DAY_MS = 86_400_000
 
@@ -228,17 +229,6 @@ export function calculateDropOffByStage(leads: LeadRecord[]): BreakdownItem[] {
     leads.filter((lead) => lead.lifecycle_status === 'lost'),
     (lead) => STAGE_LABELS[lead.current_pipeline_stage],
   )
-}
-
-export function missingLeadInformation(lead: LeadRecord): string[] {
-  const missing: string[] = []
-  if (!lead.website) missing.push('website')
-  if (!lead.contact_name) missing.push('contact name')
-  if (!lead.email) missing.push('contact email')
-  if (!lead.country) missing.push('country')
-  if (!lead.customer_segment) missing.push('segment')
-  if (!lead.next_action) missing.push('next action')
-  return missing
 }
 
 export function metricDisplay(value: number | null, suffix = ''): string {

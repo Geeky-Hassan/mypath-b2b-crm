@@ -4,13 +4,33 @@
 with checks as (
   select
     10 as display_order,
-    'migration_10_functions'::text as check_name,
+    'workflow_functions'::text as check_name,
     'fail'::text as severity,
     to_regprocedure('public.delete_crm_task(uuid)') is not null
       and to_regprocedure(
         'public.remove_lead_generator_account(uuid,uuid)'
-      ) is not null as passed,
-    'Task cleanup and team-member removal functions are installed.'::text as details
+      ) is not null
+      and to_regprocedure('public.delete_archived_lead(uuid,text)') is not null as passed,
+    'Task, team-member, and safeguarded lead cleanup functions are installed.'::text as details
+
+  union all
+
+  select
+    15,
+    'lead_delete_grants',
+    'fail',
+    not has_table_privilege('authenticated', 'public.leads', 'delete')
+      and has_function_privilege(
+        'authenticated',
+        'public.delete_archived_lead(uuid,text)',
+        'execute'
+      )
+      and not has_function_privilege(
+        'anon',
+        'public.delete_archived_lead(uuid,text)',
+        'execute'
+      ),
+    'Lead deletion is available only through the authenticated safeguarded RPC.'
 
   union all
 
@@ -212,6 +232,20 @@ with checks as (
       where owner_profile.account_status <> 'active'
     ),
     'All lead owners currently have active CRM access.'
+
+  union all
+
+  select
+    95,
+    'qualification_score_range',
+    'fail',
+    not exists (
+      select 1
+      from public.leads
+      where qualification_score is not null
+        and qualification_score not between 0 and 11
+    ),
+    'Every stored qualification score is null or within the 0-11 scale.'
 
   union all
 

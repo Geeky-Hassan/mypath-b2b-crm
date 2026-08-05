@@ -5,7 +5,7 @@ export function isFounder(role: UserRole | null | undefined): boolean {
 }
 
 export function canPermanentlyDelete(role: UserRole | null | undefined): boolean {
-  return isFounder(role)
+  return role === 'founder' || role === 'lead_generator'
 }
 
 export function canManageTargets(role: UserRole | null | undefined): boolean {

@@ -228,8 +228,8 @@ export default function TargetsPage() {
     return { profiles, targets, leads }
   }, `targets-${profile?.id}-${month}`)
 
-  if (loading) return <PageLoader label="Loading sales targets…" />
-  if (error || !data) {
+  if (loading && !data) return <PageLoader label="Loading sales targets…" />
+  if (!data) {
     return (
       <Alert tone="error" title="Targets could not be loaded">
         <p>{error}</p>
@@ -268,6 +268,11 @@ export default function TargetsPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest target changes could not be refreshed">
+          {error} The last successfully loaded targets remain visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow="Weekly and monthly focus"
         title="Targets"

@@ -25,7 +25,7 @@ const validLead: LeadFormValues = {
   reason_mypath_is_relevant: 'Needs guided learning paths',
   current_alternative: 'Spreadsheets',
   budget_indicator: '$10k-$25k',
-  qualification_score: '82',
+  qualification_score: '9',
   priority: 'high',
   source: 'linkedin',
   owner_id: '11111111-1111-4111-8111-111111111111',
@@ -54,10 +54,29 @@ describe('leadFormSchema', () => {
     if (!result.success) expect(result.error.issues[0]?.path).toEqual(['company_name'])
   })
 
-  it('rejects qualification scores outside 0 to 100', () => {
+  it('accepts whole-number qualification scores from 0 to 11', () => {
     expect(
-      leadFormSchema.safeParse({ ...validLead, qualification_score: '101' }).success,
+      leadFormSchema.safeParse({ ...validLead, qualification_score: '0' }).success,
+    ).toBe(true)
+    expect(
+      leadFormSchema.safeParse({ ...validLead, qualification_score: '11' }).success,
+    ).toBe(true)
+    expect(
+      leadFormSchema.safeParse({ ...validLead, qualification_score: '-1' }).success,
     ).toBe(false)
+    expect(
+      leadFormSchema.safeParse({ ...validLead, qualification_score: '12' }).success,
+    ).toBe(false)
+    expect(
+      leadFormSchema.safeParse({ ...validLead, qualification_score: '7.5' }).success,
+    ).toBe(false)
+  })
+
+  it('accepts Google and AI as lead sources', () => {
+    expect(leadFormSchema.safeParse({ ...validLead, source: 'google' }).success).toBe(
+      true,
+    )
+    expect(leadFormSchema.safeParse({ ...validLead, source: 'ai' }).success).toBe(true)
   })
 
   it('requires a reason when a lead is lost', () => {

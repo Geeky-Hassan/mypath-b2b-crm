@@ -8,6 +8,12 @@ restores email/password sessions, while `src/services/crm.ts` centralizes data
 access. Privileged Auth administration runs only in the `team-admin` Supabase
 Edge Function.
 
+Initial authentication blocks protected routes until the profile is known.
+Token refresh and repeated same-user sign-in/focus events update the in-memory
+session without remounting protected pages. Data revalidation preserves the last
+successful result and reports later failures non-destructively, so open forms and
+unsaved values remain mounted.
+
 The interface preserves the navy-and-teal component system. dnd-kit supplies pointer and keyboard drag sensors without changing stage order in the browser. Recharts renders three focused founder charts; tables and ranked lists carry the denser metrics so the dashboard remains readable.
 
 ## Database model
@@ -61,6 +67,12 @@ to lead foreign key: archiving retains linked work, while Founder-only permanent
 lead deletion now cascades to its linked tasks and their events. Task and Lead
 Generator dashboard queries also revalidate on focus and at a low-frequency
 visible-tab interval so another user's deletion does not remain as stale work.
+
+Migration `202608050012_reliability_and_lead_workflow.sql` adds Google and AI
+source values, proportionally converts qualification scores to 0–11, permits
+Lead Generator next-action and deletion-preparation updates, revokes direct lead
+deletion, and exposes an active-role, archived-state, exact-name deletion RPC.
+Founder readiness remains derived in the application rather than stored.
 
 ## Pipeline mutation and provenance
 

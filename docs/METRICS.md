@@ -34,16 +34,16 @@ All calculations use Supabase records loaded for the signed-in user. The applica
 
 ## Lead Generator metrics
 
-| Metric                          | Calculation                                                                                                                                                                                       |
-| ------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Weekly lead target              | The signed-in user’s Leads Added weekly target covering the current Monday-to-Sunday period.                                                                                                      |
-| Leads added this week           | Leads created by the signed-in user during that period.                                                                                                                                           |
-| Qualified leads added           | Leads created by the user this week that reached Qualified or later.                                                                                                                              |
-| Target completion               | Leads added this week ÷ weekly Leads Added target × 100. Missing/zero target displays Not enough data.                                                                                            |
-| Leads missing information       | User-created, non-archived leads missing at least one Lead Generator-editable research field: website, contact name, contact email, country, or segment. This is a warning, not a pipeline block. |
-| Leads by country/segment/source | User-created, non-archived leads grouped by each recorded field.                                                                                                                                  |
-| Rejected or unqualified         | User-created Lost leads whose manually entered lost reason contains “rejected” or “unqualified.” No qualification-score cutoff is assumed.                                                        |
-| Recent activity                 | Latest dated activity rows created by the user across leads the user created.                                                                                                                     |
+| Metric                          | Calculation                                                                                                                                                                                                                                         |
+| ------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Weekly lead target              | The signed-in user’s Leads Added weekly target covering the current Monday-to-Sunday period.                                                                                                                                                        |
+| Leads added this week           | Leads created by the signed-in user during that period.                                                                                                                                                                                             |
+| Qualified leads added           | Leads created by the user this week that reached Qualified or later.                                                                                                                                                                                |
+| Target completion               | Leads added this week ÷ weekly Leads Added target × 100. Missing/zero target displays Not enough data.                                                                                                                                              |
+| Leads missing information       | User-created, non-archived leads missing at least one Ready for Founder field: website, country, segment, contact name/email, main pain point, MyPath relevance, 0–11 qualification score, or next action. This is a warning, not a pipeline block. |
+| Leads by country/segment/source | User-created, non-archived leads grouped by each recorded field.                                                                                                                                                                                    |
+| Rejected or unqualified         | User-created Lost leads whose manually entered lost reason contains “rejected” or “unqualified.” No qualification-score cutoff is assumed.                                                                                                          |
+| Recent activity                 | Latest dated activity rows created by the user across leads the user created.                                                                                                                                                                       |
 
 ## Target actuals
 

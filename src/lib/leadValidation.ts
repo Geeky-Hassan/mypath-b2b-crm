@@ -30,6 +30,13 @@ const numericString = (label: string, min: number, max?: number) =>
     `${label} must be ${max == null ? `${min} or more` : `between ${min} and ${max}`}.`,
   )
 
+const integerString = (label: string, min: number, max: number) =>
+  z.string().refine((value) => {
+    if (!value.trim()) return true
+    const number = Number(value)
+    return Number.isInteger(number) && number >= min && number <= max
+  }, `${label} must be a whole number between ${min} and ${max}.`)
+
 function isCalendarDate(value: string): boolean {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
   const date = new Date(`${value}T00:00:00Z`)
@@ -70,7 +77,7 @@ const leadFormBaseSchema = z.object({
   reason_mypath_is_relevant: z.string(),
   current_alternative: z.string(),
   budget_indicator: z.string(),
-  qualification_score: numericString('Qualification score', 0, 100),
+  qualification_score: integerString('Qualification score', 0, 11),
   priority: z.enum(LEAD_PRIORITIES),
   source: z.enum(LEAD_SOURCES),
   owner_id: z.string().uuid('Select a valid owner.'),

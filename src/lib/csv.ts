@@ -76,6 +76,8 @@ export const LEAD_GENERATOR_IMPORT_KEYS: ImportFieldKey[] = [
   'source',
   'owner_email',
   'date_added',
+  'next_action',
+  'next_action_date',
   'notes',
 ]
 
@@ -205,7 +207,7 @@ export function importTemplateCsv(): string {
     reason_mypath_is_relevant: 'Needs one guided learning and progress experience',
     current_alternative: 'Manual LMS workflows',
     budget_indicator: '$10k-$25k',
-    qualification_score: 82,
+    qualification_score: 9,
     priority: 'high',
     source: 'linkedin',
     owner_email: 'noor@your-domain.com',
@@ -250,11 +252,13 @@ export function leadGeneratorTemplateCsv(): string {
       reason_mypath_is_relevant: 'Needs one guided learning experience',
       current_alternative: 'Manual LMS workflows',
       budget_indicator: 'Budget not yet confirmed',
-      qualification_score: '82',
+      qualification_score: '9',
       priority: 'high',
       source: 'linkedin',
       owner_email: '',
       date_added: '2026-08-03',
+      next_action: 'Review the research and prepare outreach',
+      next_action_date: '2026-08-10',
       notes: 'Example row. Replace or remove before importing.',
     },
     {
@@ -281,6 +285,8 @@ export function leadGeneratorTemplateCsv(): string {
       source: 'referral',
       owner_email: '',
       date_added: '2026-08-03',
+      next_action: '',
+      next_action_date: '',
       notes: 'Most fields are optional; company_name is required.',
     },
   ]

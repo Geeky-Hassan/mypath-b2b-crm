@@ -98,8 +98,8 @@ function valuesForValidation(
     date_added: mapped.date_added || dateInputValue(),
     first_contacted_at: isFounder ? (mapped.first_contacted_at ?? '') : '',
     last_contacted_at: isFounder ? (mapped.last_contacted_at ?? '') : '',
-    next_action: isFounder ? (mapped.next_action ?? '') : '',
-    next_action_date: isFounder ? (mapped.next_action_date ?? '') : '',
+    next_action: mapped.next_action ?? '',
+    next_action_date: mapped.next_action_date ?? '',
     demo_date: isFounder ? (mapped.demo_date ?? '') : '',
     proposed_value: isFounder ? (mapped.proposed_value ?? '') : '',
     expected_close_date: isFounder ? (mapped.expected_close_date ?? '') : '',
@@ -152,7 +152,7 @@ export default function ImportPage() {
   const currentStep = preview.length ? 3 : parsed ? 2 : 1
 
   if (loading && !data) return <PageLoader label="Preparing CSV tools…" />
-  if (error || !data) {
+  if (!data) {
     return (
       <Alert tone="error" title="Import tools could not be loaded">
         {error ?? 'No CRM data was returned.'}
@@ -348,6 +348,11 @@ export default function ImportPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest CRM data could not be refreshed">
+          {error} The last successfully loaded data remains available for this import.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow={isFounder ? 'Founder tools' : 'Lead generation tools'}
         title={isFounder ? 'Import & export' : 'Bulk lead import'}

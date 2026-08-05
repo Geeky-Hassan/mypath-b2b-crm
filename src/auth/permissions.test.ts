@@ -18,9 +18,9 @@ describe('role permissions', () => {
     expect(canMoveLead('founder', 'demo_booked', 'negotiation')).toBe(true)
   })
 
-  it('blocks founder-only operations for lead generators and missing profiles', () => {
+  it('keeps founder controls restricted while allowing safeguarded lead deletion', () => {
     expect(isFounder('lead_generator')).toBe(false)
-    expect(canPermanentlyDelete('lead_generator')).toBe(false)
+    expect(canPermanentlyDelete('lead_generator')).toBe(true)
     expect(canManageTargets('lead_generator')).toBe(false)
     expect(canArchiveLead('lead_generator')).toBe(false)
     expect(canManageDealFields('lead_generator')).toBe(false)

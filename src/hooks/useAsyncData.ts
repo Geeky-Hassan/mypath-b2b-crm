@@ -4,6 +4,7 @@ interface AsyncState<T> {
   data: T | null
   error: string | null
   loading: boolean
+  refreshing: boolean
   refresh: () => Promise<void>
 }
 
@@ -11,9 +12,11 @@ export function useAsyncData<T>(loader: () => Promise<T>, key: string): AsyncSta
   const loaderRef = useRef(loader)
   const requestRef = useRef(0)
   const mountedRef = useRef(true)
+  const dataRef = useRef<T | null>(null)
   const [data, setData] = useState<T | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
+  const [refreshing, setRefreshing] = useState(false)
 
   useEffect(() => {
     loaderRef.current = loader
@@ -21,17 +24,25 @@ export function useAsyncData<T>(loader: () => Promise<T>, key: string): AsyncSta
 
   const refresh = useCallback(async () => {
     const requestId = ++requestRef.current
-    setLoading(true)
+    const hasData = dataRef.current !== null
+    if (hasData) setRefreshing(true)
+    else setLoading(true)
     setError(null)
     try {
       const nextData = await loaderRef.current()
-      if (mountedRef.current && requestRef.current === requestId) setData(nextData)
+      if (mountedRef.current && requestRef.current === requestId) {
+        dataRef.current = nextData
+        setData(nextData)
+      }
     } catch (caught) {
       if (mountedRef.current && requestRef.current === requestId) {
         setError(caught instanceof Error ? caught.message : 'Something went wrong.')
       }
     } finally {
-      if (mountedRef.current && requestRef.current === requestId) setLoading(false)
+      if (mountedRef.current && requestRef.current === requestId) {
+        setLoading(false)
+        setRefreshing(false)
+      }
     }
   }, [])
 
@@ -48,5 +59,5 @@ export function useAsyncData<T>(loader: () => Promise<T>, key: string): AsyncSta
     void refresh()
   }, [key, refresh])
 
-  return { data, error, loading, refresh }
+  return { data, error, loading, refreshing, refresh }
 }

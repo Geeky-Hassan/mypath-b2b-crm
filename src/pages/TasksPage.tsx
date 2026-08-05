@@ -263,7 +263,7 @@ export default function TasksPage() {
   }, [assignee, data?.tasks, search, showClosed, status])
 
   if (loading && !data) return <PageLoader label="Loading team tasks…" />
-  if (error || !data || !profile || !user)
+  if (!data || !profile || !user)
     return (
       <Alert tone="error" title="Tasks could not be loaded">
         {error ?? 'Your session is unavailable.'}
@@ -303,6 +303,11 @@ export default function TasksPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest task changes could not be refreshed">
+          {error} The last successfully loaded tasks remain visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow={isFounder ? 'Team operations' : 'My workload'}
         title={isFounder ? 'Tasks' : 'My tasks'}

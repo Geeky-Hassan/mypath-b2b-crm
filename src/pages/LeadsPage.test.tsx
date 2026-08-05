@@ -91,6 +91,31 @@ describe('lead form', () => {
     expect(onSaved).toHaveBeenCalledTimes(1)
   })
 
+  it('lets a Lead Generator save next-action fields and use the new sources', async () => {
+    const user = userEvent.setup()
+    renderForm()
+
+    expect(screen.getByRole('option', { name: 'Google' })).toBeTruthy()
+    expect(screen.getByRole('option', { name: 'AI' })).toBeTruthy()
+    await user.type(screen.getByLabelText(/^Company name/), 'Research Ready')
+    await user.selectOptions(screen.getByLabelText('Source'), 'ai')
+    await user.type(screen.getByLabelText('Next action'), 'Founder review')
+    await user.type(screen.getByLabelText('Next action date'), '2026-08-10')
+    await user.click(screen.getByRole('button', { name: 'Add lead' }))
+
+    await waitFor(() => expect(crmMocks.saveLead).toHaveBeenCalledTimes(1))
+    expect(crmMocks.saveLead).toHaveBeenCalledWith(
+      expect.objectContaining({
+        source: 'ai',
+        next_action: 'Founder review',
+        next_action_date: '2026-08-10',
+      }),
+      userId,
+      undefined,
+      false,
+    )
+  })
+
   it('does not expose founder-only deal and pipeline controls', () => {
     renderForm()
 

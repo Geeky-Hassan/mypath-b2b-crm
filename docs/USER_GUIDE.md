@@ -14,7 +14,7 @@ The CRM is a shared workspace. Both users can see leads, activities, and pipelin
 2. Add the lead from **Leads**, including the company name and all facts available.
 3. Set the lead source, customer segment, country, primary contact, and owner.
 4. Use the qualification fields and move the lead to **Qualified** when the evidence supports it.
-5. Check the dashboard's **Missing information** list and fill the gaps.
+5. Add the next action and check the dashboard's **Missing information** list until the lead shows **Ready for Founder**.
 6. Add dated activities and notes so the founder can understand the context.
 7. Review **My tasks**, complete overdue/today work first, and add factual completion notes.
 8. Review **Targets** and work toward weekly and monthly outcomes.
@@ -41,9 +41,9 @@ Duplicate warnings compare normalized company websites and contact email address
   the CRM stores valid numbers as E.164 and displays a clickable call action.
 - Search covers company, contact, email, and website. Filters and sorting can be combined.
 - Founder-only **Archive** removes a lead from normal active views without deleting its history. Restore reverses this action.
-- The founder can choose **Delete** on any lead. The dialog first archives an
-  active lead, then requires the exact company name before permanent deletion.
-  Lead Generators never see this action.
+- Both roles can choose **Delete** on any lead. The dialog first archives the
+  lead, then requires the exact company name before the protected database
+  function permanently deletes it. Use **Restore** to cancel an archived deletion.
 - Activity deletion is permanent and asks for confirmation. Add corrections as a new activity when preserving history matters.
 
 ## Pipeline and keyboard use
@@ -53,6 +53,11 @@ Every stage move opens a confirmation form. Add a concise description of what ha
 Open a card by activating its company-name button. The drawer contains a keyboard-friendly stage control. The founder may also drag cards; focus a drag handle, press Space or Enter, use arrow keys to select a destination, and press Space or Enter again. Press Escape to cancel. A Lead Generator can move only Lead Added to Qualified.
 
 Moving into proposal, negotiation, or a won stage requires a positive proposed value. Other missing information is shown as a warning and does not invent or block factual pipeline progress.
+
+The top pipeline scrollbar stays available beneath the application header and
+moves together with the scrollbar below the board. A green **Ready for Founder**
+label requires website, country, segment, contact name/email, main pain point,
+MyPath relevance, a 0–11 qualification score, and next action.
 
 ## Targets and dashboards
 
@@ -91,7 +96,7 @@ CSV import is available to both roles; export is Founder-only.
 7. Confirm the import. All accepted rows are submitted in one database insert; if that insert fails, no accepted row is saved.
 
 Lead Generators should use the Excel-ready template and save it as **CSV UTF-8**.
-Only permitted research and qualification fields are mapped; imported leads
+Only permitted research, qualification, and next-action fields are mapped; imported leads
 always start Active at Lead Added. Invalid rows are skipped before confirmation.
 Duplicate-warning rows are skipped unless included. A blank owner email assigns
 the importer. Founders can export filtered data from **Leads** or all leads from

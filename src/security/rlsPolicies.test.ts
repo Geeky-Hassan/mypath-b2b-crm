@@ -62,6 +62,13 @@ const taskConsistency = readFileSync(
   ),
   'utf8',
 )
+const workflowUpgrade = readFileSync(
+  new URL(
+    '../../supabase/migrations/202608050012_reliability_and_lead_workflow.sql',
+    import.meta.url,
+  ),
+  'utf8',
+)
 const preImportReadiness = readFileSync(
   new URL('../../supabase/verification/pre_import_readiness.sql', import.meta.url),
   'utf8',
@@ -246,6 +253,46 @@ describe('RLS migration contract', () => {
       /foreign key \(lead_id\)[\s\S]*references public\.leads\(id\)[\s\S]*on delete cascade/,
     )
     expect(taskConsistency).not.toMatch(/delete from public\.leads/)
+  })
+
+  it('moves qualification scores to 0-11 and adds the new sources transactionally', () => {
+    expect(workflowUpgrade).toContain(
+      "alter type public.lead_source add value if not exists 'google'",
+    )
+    expect(workflowUpgrade).toContain(
+      "alter type public.lead_source add value if not exists 'ai'",
+    )
+    expect(workflowUpgrade).toMatch(
+      /round\(qualification_score::numeric \* 11 \/ 100\)::integer/,
+    )
+    expect(workflowUpgrade).toMatch(
+      /constraint leads_qualification_score_range[\s\S]*between 0 and 11/,
+    )
+  })
+
+  it('allows readiness follow-up edits but retains lead-generator sales boundaries', () => {
+    expect(workflowUpgrade).not.toMatch(
+      /new\.next_action is distinct from old\.next_action/,
+    )
+    expect(workflowUpgrade).toContain(
+      "message = 'This sales or lifecycle field requires the Founder role'",
+    )
+    expect(workflowUpgrade).toMatch(
+      /new\.lifecycle_status = 'archived'[\s\S]*old\.lifecycle_status = 'archived'[\s\S]*new\.lifecycle_status = 'active'/,
+    )
+  })
+
+  it('requires active access, archive state, and exact name through a deletion RPC', () => {
+    expect(workflowUpgrade).toContain('public.delete_archived_lead')
+    expect(workflowUpgrade).toContain('private.can_use_crm()')
+    expect(workflowUpgrade).toContain("lifecycle_status = 'archived'")
+    expect(workflowUpgrade).toContain(
+      'p_expected_company_name is distinct from v_company_name',
+    )
+    expect(workflowUpgrade).toContain('revoke delete on public.leads from authenticated')
+    expect(workflowUpgrade).toContain(
+      'grant execute on function public.delete_archived_lead(uuid, text)',
+    )
   })
 
   it('removes team workload without deleting or falsifying lead audit history', () => {

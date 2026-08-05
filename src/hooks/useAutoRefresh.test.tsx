@@ -28,4 +28,17 @@ describe('useAutoRefresh', () => {
 
     expect(refresh).not.toHaveBeenCalled()
   })
+
+  it('collapses focus and visibility events fired for the same tab return', async () => {
+    const refresh = vi.fn().mockResolvedValue(undefined)
+    vi.spyOn(document, 'visibilityState', 'get').mockReturnValue('visible')
+    renderHook(() => useAutoRefresh(refresh, 60_000))
+
+    await act(async () => {
+      document.dispatchEvent(new Event('visibilitychange'))
+      window.dispatchEvent(new Event('focus'))
+    })
+
+    expect(refresh).toHaveBeenCalledTimes(1)
+  })
 })

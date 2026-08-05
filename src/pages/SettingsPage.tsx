@@ -75,7 +75,7 @@ export default function SettingsPage() {
   }, 'settings-and-users')
 
   if (loading && !data) return <PageLoader label="Loading CRM settings…" />
-  if (error || !data || !user)
+  if (!data || !user)
     return (
       <Alert tone="error" title="Settings could not be loaded">
         {error ?? 'Your session is unavailable.'}
@@ -112,6 +112,11 @@ export default function SettingsPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest settings could not be refreshed">
+          {error} The last successfully loaded settings remain visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow="Founder controls"
         title="CRM settings"

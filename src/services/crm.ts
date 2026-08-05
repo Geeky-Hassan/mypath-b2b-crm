@@ -1,4 +1,8 @@
 import { getSupabase } from '../lib/supabase'
+import {
+  READY_FOR_FOUNDER_COLUMNS,
+  READY_FOR_FOUNDER_TEXT_COLUMNS,
+} from '../lib/leadReadiness'
 import { TARGET_TYPES } from '../types/domain'
 import type {
   ActivityType,
@@ -29,7 +33,7 @@ export const DEFAULT_LEAD_FILTERS: LeadFilters = {
   source: 'all',
   ownerId: '',
   creatorId: '',
-  missingInfo: false,
+  readiness: 'all',
   priority: 'all',
   sortBy: 'updated_at',
   sortDirection: 'desc',
@@ -67,6 +71,8 @@ export function leadPayload(input: LeadInput, includeFounderFields = true) {
     source: input.source,
     owner_id: input.owner_id,
     date_added: input.date_added,
+    next_action: optional(input.next_action),
+    next_action_date: optional(input.next_action_date),
     notes: optional(input.notes),
   }
   if (!includeFounderFields) return shared
@@ -76,8 +82,6 @@ export function leadPayload(input: LeadInput, includeFounderFields = true) {
     lifecycle_status: input.lifecycle_status,
     first_contacted_at: input.first_contacted_at ?? null,
     last_contacted_at: input.last_contacted_at ?? null,
-    next_action: optional(input.next_action),
-    next_action_date: optional(input.next_action_date),
     demo_date: input.demo_date ?? null,
     proposed_value: input.proposed_value ?? null,
     expected_close_date: optional(input.expected_close_date),
@@ -140,10 +144,27 @@ export async function getLeadsPage(filters: LeadFilters): Promise<PaginatedLeads
   if (filters.source !== 'all') query = query.eq('source', filters.source)
   if (filters.ownerId) query = query.eq('owner_id', filters.ownerId)
   if (filters.creatorId) query = query.eq('created_by', filters.creatorId)
-  if (filters.missingInfo) {
-    query = query.or(
-      'website.is.null,contact_name.is.null,email.is.null,country.is.null,customer_segment.is.null',
+  if (filters.readiness === 'missing') {
+    const filters = READY_FOR_FOUNDER_COLUMNS.flatMap((column) =>
+      READY_FOR_FOUNDER_TEXT_COLUMNS.includes(
+        column as (typeof READY_FOR_FOUNDER_TEXT_COLUMNS)[number],
+      )
+        ? [`${column}.is.null`, `${column}.eq.`]
+        : [`${column}.is.null`],
     )
+    query = query.or(filters.join(','))
+  }
+  if (filters.readiness === 'ready') {
+    for (const column of READY_FOR_FOUNDER_COLUMNS) {
+      query = query.not(column, 'is', null)
+      if (
+        READY_FOR_FOUNDER_TEXT_COLUMNS.includes(
+          column as (typeof READY_FOR_FOUNDER_TEXT_COLUMNS)[number],
+        )
+      ) {
+        query = query.neq(column, '')
+      }
+    }
   }
   if (filters.priority !== 'all') query = query.eq('priority', filters.priority)
 
@@ -307,21 +328,24 @@ export async function setLeadArchived(leadId: string, archived: boolean): Promis
   if (count !== 1) {
     throw new Error(
       archived
-        ? 'The lead was not archived. Check that it still exists and that you have Founder access.'
-        : 'The lead was not restored. Check that it still exists and that you have Founder access.',
+        ? 'The lead was not archived. Check that it still exists and that your CRM access is active.'
+        : 'The lead was not restored. Check that it still exists and that your CRM access is active.',
     )
   }
 }
 
-export async function permanentlyDeleteLead(leadId: string): Promise<void> {
-  const { error, count } = await getSupabase()
-    .from('leads')
-    .delete({ count: 'exact' })
-    .eq('id', leadId)
+export async function permanentlyDeleteLead(
+  leadId: string,
+  expectedCompanyName: string,
+): Promise<void> {
+  const { data, error } = await getSupabase().rpc('delete_archived_lead', {
+    p_lead_id: leadId,
+    p_expected_company_name: expectedCompanyName,
+  })
   if (error) throw error
-  if (count !== 1) {
+  if (data !== 1) {
     throw new Error(
-      'The lead was not deleted. It must be archived first and you must have Founder access.',
+      'The lead was not deleted. It must be archived and the company name must match.',
     )
   }
 }

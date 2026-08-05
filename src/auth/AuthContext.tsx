@@ -8,7 +8,7 @@ import {
   useState,
   type ReactNode,
 } from 'react'
-import type { Session, User } from '@supabase/supabase-js'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { getSupabase } from '../lib/supabase'
 import type { Profile } from '../types/domain'
 
@@ -41,56 +41,93 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const profileRequest = useRef(0)
+  const mountedRef = useRef(true)
+  const sessionRef = useRef<Session | null>(null)
+  const profileRef = useRef<Profile | null>(null)
 
-  const loadSession = useCallback(async (nextSession: Session | null) => {
+  const loadProfile = useCallback(async (userId: string, blocking: boolean) => {
     const requestId = ++profileRequest.current
-    setSession(nextSession)
-    setError(null)
-    if (!nextSession?.user) {
-      setProfile(null)
-      setLoading(false)
-      return
-    }
-    setLoading(true)
+    if (blocking) setLoading(true)
     try {
-      const nextProfile = await fetchProfile(nextSession.user.id)
-      if (profileRequest.current !== requestId) return
+      const nextProfile = await fetchProfile(userId)
+      if (
+        !mountedRef.current ||
+        profileRequest.current !== requestId ||
+        sessionRef.current?.user.id !== userId
+      ) {
+        return
+      }
+      profileRef.current = nextProfile
       setProfile(nextProfile)
+      setError(null)
     } catch (caught) {
-      if (profileRequest.current !== requestId) return
+      if (!mountedRef.current || profileRequest.current !== requestId) return
       console.error('CRM profile load failed', caught)
-      setProfile(null)
-      setError(
-        'Your CRM profile could not be loaded. Ask the administrator to check your role.',
-      )
+      if (!profileRef.current) {
+        setProfile(null)
+        setError(
+          'Your CRM profile could not be loaded. Ask the administrator to check your role.',
+        )
+      }
     } finally {
-      if (profileRequest.current === requestId) setLoading(false)
+      if (mountedRef.current && profileRequest.current === requestId) setLoading(false)
     }
   }, [])
 
-  useEffect(() => {
-    const supabase = getSupabase()
-    let active = true
-    void supabase.auth.getSession().then(({ data, error: sessionError }) => {
-      if (!active) return
-      if (sessionError) {
-        console.error('Supabase session restoration failed', sessionError)
-        setError('Your session could not be restored. Sign in again.')
+  const acceptSession = useCallback(
+    (event: AuthChangeEvent, nextSession: Session | null) => {
+      const previousUserId = sessionRef.current?.user.id ?? null
+      const nextUserId = nextSession?.user.id ?? null
+      const userChanged = previousUserId !== nextUserId
+
+      sessionRef.current = nextSession
+      setSession(nextSession)
+
+      if (!nextSession?.user) {
+        profileRequest.current += 1
+        profileRef.current = null
+        setProfile(null)
+        setError(null)
         setLoading(false)
         return
       }
-      void loadSession(data.session)
-    })
 
-    const { data } = supabase.auth.onAuthStateChange((_event, nextSession) => {
-      if (!active) return
-      void loadSession(nextSession)
+      const userId = nextSession.user.id
+      if (event === 'TOKEN_REFRESHED') return
+
+      const hasCurrentProfile = profileRef.current?.id === userId
+      if (event === 'SIGNED_IN' && hasCurrentProfile && !userChanged) return
+
+      if (event === 'USER_UPDATED' && hasCurrentProfile && !userChanged) {
+        queueMicrotask(() => {
+          if (mountedRef.current) void loadProfile(userId, false)
+        })
+        return
+      }
+
+      if (!hasCurrentProfile || userChanged) {
+        setError(null)
+        queueMicrotask(() => {
+          if (mountedRef.current) void loadProfile(userId, true)
+        })
+      }
+    },
+    [loadProfile],
+  )
+
+  useEffect(() => {
+    const supabase = getSupabase()
+    mountedRef.current = true
+    const { data } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      if (!mountedRef.current) return
+      acceptSession(event, nextSession)
     })
     return () => {
-      active = false
+      mountedRef.current = false
+      profileRequest.current += 1
       data.subscription.unsubscribe()
     }
-  }, [loadSession])
+  }, [acceptSession])
 
   const value = useMemo<AuthContextValue>(
     () => ({
@@ -105,18 +142,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           password,
         })
         if (signInError) throw signInError
-        await loadSession(data.session)
+        if (sessionRef.current?.user.id !== data.session?.user.id) {
+          acceptSession('SIGNED_IN', data.session)
+        }
       },
       signOut: async () => {
         const { error: signOutError } = await getSupabase().auth.signOut()
         if (signOutError) throw signOutError
+        acceptSession('SIGNED_OUT', null)
       },
       reloadProfile: async () => {
         if (!session?.user) return
-        await loadSession(session)
+        await loadProfile(session.user.id, !profileRef.current)
       },
     }),
-    [session, profile, loading, error, loadSession],
+    [session, profile, loading, error, acceptSession, loadProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

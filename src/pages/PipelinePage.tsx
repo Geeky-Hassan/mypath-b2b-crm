@@ -29,6 +29,8 @@ import {
   Textarea,
 } from '../components/ui'
 import { useToast } from '../components/ui/ToastProvider'
+import { LeadReadinessBadge } from '../components/LeadReadinessBadge'
+import { SynchronizedHorizontalScroll } from '../components/SynchronizedHorizontalScroll'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { formatDate, formatDateTime, formatMoney, stageLabel } from '../lib/format'
 import { missingLeadInformation } from '../lib/metrics'
@@ -43,6 +45,7 @@ import {
   FUNNEL_LABELS,
   FUNNEL_STAGES,
   LEAD_SOURCES,
+  LEAD_SOURCE_LABELS,
   PIPELINE_STAGES,
   STAGE_TO_FUNNEL,
   type FunnelStage,
@@ -85,7 +88,6 @@ function PipelineCard({
     data: { lead },
     disabled: busy || !draggable,
   })
-  const warnings = missingLeadInformation(lead)
   const currentHistory = lead.stage_history?.find(
     (event) => event.new_stage === lead.current_pipeline_stage,
   )
@@ -141,17 +143,7 @@ function PipelineCard({
             Qualification
           </p>
         )}
-        {warnings.length ? (
-          <span
-            title={`Missing: ${warnings.join(', ')}`}
-            tabIndex={0}
-            className="rounded-full bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700"
-          >
-            {warnings.length} missing
-          </span>
-        ) : (
-          <Badge tone="green">Ready</Badge>
-        )}
+        <LeadReadinessBadge lead={lead} />
       </div>
       <p
         className="mt-2.5 line-clamp-2 text-[10px] leading-4 text-slate-600"
@@ -263,6 +255,7 @@ function LeadPipelineDetail({
       <div className="flex flex-wrap items-center gap-2">
         <Badge tone="teal">{stageLabel(lead.current_pipeline_stage)}</Badge>
         <Badge>{lead.lifecycle_status}</Badge>
+        <LeadReadinessBadge lead={lead} />
         {isFounder &&
         lead.lifecycle_status !== 'won' &&
         lead.lifecycle_status !== 'lost' ? (
@@ -312,7 +305,7 @@ function LeadPipelineDetail({
         <Detail label="Owner" value={lead.owner?.full_name} />
         <Detail label="Segment" value={lead.customer_segment} />
         <Detail label="Country" value={lead.country} />
-        <Detail label="Source" value={lead.source} />
+        <Detail label="Source" value={LEAD_SOURCE_LABELS[lead.source]} />
         {isFounder ? (
           <Detail
             label="Proposed value"
@@ -541,7 +534,7 @@ export default function PipelinePage() {
   }
 
   if (loading && !data) return <PageLoader label="Building the sales pipeline…" />
-  if (error || !data) {
+  if (!data) {
     return (
       <Alert tone="error" title="Pipeline could not be loaded">
         <p>{error}</p>
@@ -559,6 +552,11 @@ export default function PipelinePage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest pipeline changes could not be refreshed">
+          {error} The last successfully loaded board remains visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow="Operational sales funnel"
         title="Pipeline"
@@ -602,7 +600,7 @@ export default function PipelinePage() {
           <option value="">All sources</option>
           {LEAD_SOURCES.map((item) => (
             <option key={item} value={item}>
-              {item}
+              {LEAD_SOURCE_LABELS[item]}
             </option>
           ))}
         </Select>
@@ -654,7 +652,7 @@ export default function PipelinePage() {
           onDragEnd={onDragEnd}
           onDragCancel={() => setActiveLead(null)}
         >
-          <div className="overflow-x-auto pb-5">
+          <SynchronizedHorizontalScroll>
             <div
               className="grid w-max gap-3"
               style={{ gridTemplateColumns: `repeat(${PIPELINE_STAGES.length}, 17rem)` }}
@@ -689,7 +687,7 @@ export default function PipelinePage() {
                 />
               ))}
             </div>
-          </div>
+          </SynchronizedHorizontalScroll>
           <DragOverlay>
             {activeLead ? (
               <Card className="w-72 p-4 shadow-xl">

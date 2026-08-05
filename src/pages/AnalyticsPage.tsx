@@ -46,6 +46,7 @@ import {
   FUNNEL_LABELS,
   FUNNEL_STAGES,
   LEAD_SOURCES,
+  LEAD_SOURCE_LABELS,
   LIFECYCLE_LABELS,
   PIPELINE_STAGES,
   STAGE_TO_FUNNEL,
@@ -218,8 +219,8 @@ export default function AnalyticsPage() {
     })
   }, [country, data, endDate, ownerId, segment, source, startDate])
 
-  if (loading) return <PageLoader label="Connecting journey analytics…" />
-  if (error || !data)
+  if (loading && !data) return <PageLoader label="Connecting journey analytics…" />
+  if (!data)
     return (
       <Alert tone="error" title="Analytics could not be loaded">
         <p>{error ?? 'CRM data is not available.'}</p>
@@ -243,7 +244,7 @@ export default function AnalyticsPage() {
     .sort()
     .map(String)
   const funnel = calculateFunnelCounts(filtered)
-  const sources = calculateBreakdown(filtered, (lead) => lead.source)
+  const sources = calculateBreakdown(filtered, (lead) => LEAD_SOURCE_LABELS[lead.source])
   const lifecycles = calculateBreakdown(
     filtered,
     (lead) => LIFECYCLE_LABELS[lead.lifecycle_status],
@@ -305,6 +306,11 @@ export default function AnalyticsPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest analytics could not be refreshed">
+          {error} The last successfully loaded data remains visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow="Connected sales intelligence"
         title="Journey analytics"
@@ -354,7 +360,7 @@ export default function AnalyticsPage() {
             <option value="">All sources</option>
             {LEAD_SOURCES.map((item) => (
               <option key={item} value={item}>
-                {item}
+                {LEAD_SOURCE_LABELS[item]}
               </option>
             ))}
           </Select>

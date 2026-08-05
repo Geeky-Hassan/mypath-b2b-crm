@@ -19,6 +19,12 @@ Apply every migration in filename order through the Supabase SQL Editor or CLI:
 9. `202608040009_direct_login_account_access.sql`
 10. `202608040010_safe_team_member_removal.sql`
 11. `202608040011_task_assignment_consistency.sql`
+12. `202608050012_reliability_and_lead_workflow.sql`
+
+Before migration 12, take a Supabase backup and record the lead count and
+non-null qualification-score count. The migration preserves every lead while
+mapping scores with `round(old × 11 ÷ 100)`; after it commits, confirm the lead
+count is unchanged and no non-null score falls outside 0–11.
 
 Then deploy the authenticated Edge Function:
 
@@ -92,18 +98,18 @@ or Removed accounts; existing historical ownership may remain until reassigned.
 
 ## Effective access matrix
 
-| Resource      | Anonymous | Lead Generator                                                    | Founder                                    |
-| ------------- | --------- | ----------------------------------------------------------------- | ------------------------------------------ |
-| Profiles      | No access | Read all; update own name only                                    | Read all; update own name only             |
-| Leads         | No access | Read shared non-financial data; create/enrich; Added -> Qualified | Full read/update; archive; delete archived |
-| Activities    | No access | Read all; create; edit/delete own                                 | Read all; create; manage all               |
-| Stage history | No access | Read only                                                         | Read only                                  |
-| Targets       | No access | Read own only                                                     | Read and manage all                        |
-| Sales costs   | No access | No access                                                         | Read and manage                            |
-| CRM settings  | No access | Read                                                              | Read and update                            |
-| Tasks         | No access | Read assigned; update status/note                                 | Create, assign, edit, cancel, delete       |
-| Task events   | No access | Read events for assigned tasks                                    | Read all; trigger-owned writes             |
-| Account admin | No access | No access                                                         | Manage Lead Generator Auth accounts        |
+| Resource      | Anonymous | Lead Generator                                                                             | Founder                                       |
+| ------------- | --------- | ------------------------------------------------------------------------------------------ | --------------------------------------------- |
+| Profiles      | No access | Read all; update own name only                                                             | Read all; update own name only                |
+| Leads         | No access | Read/enrich shared non-financial data; next action; Added -> Qualified; safeguarded delete | Full read/update; archive; safeguarded delete |
+| Activities    | No access | Read all; create; edit/delete own                                                          | Read all; create; manage all                  |
+| Stage history | No access | Read only                                                                                  | Read only                                     |
+| Targets       | No access | Read own only                                                                              | Read and manage all                           |
+| Sales costs   | No access | No access                                                                                  | Read and manage                               |
+| CRM settings  | No access | Read                                                                                       | Read and update                               |
+| Tasks         | No access | Read assigned; update status/note                                                          | Create, assign, edit, cancel, delete          |
+| Task events   | No access | Read events for assigned tasks                                                             | Read all; trigger-owned writes                |
+| Account admin | No access | No access                                                                                  | Manage Lead Generator Auth accounts           |
 
 RLS is enabled on every exposed V1 table. Policies target `authenticated` and
 require `private.can_use_crm()`: an Active authorised account.
@@ -116,13 +122,13 @@ are revoked; database triggers own those records.
 Use Founder and Lead Generator test sessions through the browser or Supabase JavaScript client. The SQL Editor normally runs with elevated privileges and is not a valid RLS test.
 
 - Without a session, selects and mutations for every CRM table must fail or return no rows.
-- A Lead Generator can read shared non-financial lead data and update company/contact/qualification fields.
-- A Lead Generator can move Lead Added to Qualified, but later stage, lifecycle, follow-up, proposed-value, archive, and delete requests must fail or affect zero rows.
+- A Lead Generator can read shared non-financial lead data and update company/contact/qualification and next-action fields.
+- A Lead Generator can move Lead Added to Qualified and archive/restore for deletion, but later stage, other lifecycle, contact-timestamp, proposed-value, and direct table-delete requests must fail or affect zero rows.
 - A Lead Generator can read only personal target rows and cannot insert, update, or delete targets.
 - A Lead Generator cannot read `sales_costs` or update `crm_settings`.
-- Noor can start the delete flow from any lead. The UI requires archive first,
-  then an exact company-name confirmation; the database still rejects deletion
-  unless the row is archived.
+- Both active roles can start the delete flow from any lead. The UI requires
+  archive first, then an exact company-name confirmation; direct table deletion
+  is revoked and the RPC rejects non-archived or mismatched requests.
 - Neither browser session can insert, update, or delete `stage_history` directly.
 - A disabled user cannot select CRM data, even with an older session.
 - A Lead Generator sees only assigned tasks and cannot create, reassign, cancel, delete, or
@@ -147,7 +153,7 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
 - Before migrations or bulk imports, take a database backup using the Supabase-supported backup or PostgreSQL dump workflow available for the project.
 - Periodically test a restore into a separate project. A backup is not proven until restoration is verified.
 - Keep Auth users and database data in the same recovery plan; a leads-only CSV cannot reconstruct user IDs or audit ownership.
-- After migration 11 and before bulk import, run the read-only
+- After migration 12 and before bulk import, run the read-only
   `supabase/verification/pre_import_readiness.sql` query. Resolve all `FAIL`
   results and review duplicate/disabled-owner `WARNING` results.
 

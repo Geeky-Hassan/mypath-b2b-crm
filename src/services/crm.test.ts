@@ -8,6 +8,12 @@ const supabaseMocks = vi.hoisted(() => ({
   delete: vi.fn(),
   eq: vi.fn(),
   rpc: vi.fn(),
+  select: vi.fn(),
+  or: vi.fn(),
+  not: vi.fn(),
+  neq: vi.fn(),
+  order: vi.fn(),
+  range: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
@@ -15,7 +21,9 @@ vi.mock('../lib/supabase', () => ({
 }))
 
 import {
+  DEFAULT_LEAD_FILTERS,
   deleteTask,
+  getLeadsPage,
   importLeadRows,
   moveLeadStage,
   permanentlyDeleteLead,
@@ -98,6 +106,8 @@ describe('transactional CSV persistence', () => {
           ...lead,
           current_pipeline_stage: 'negotiation',
           lifecycle_status: 'won',
+          next_action: 'Founder review',
+          next_action_date: '2026-08-10',
           proposed_value: 50000,
           expected_close_date: '2026-09-01',
         },
@@ -111,6 +121,52 @@ describe('transactional CSV persistence', () => {
     expect(payload).not.toHaveProperty('lifecycle_status')
     expect(payload).not.toHaveProperty('proposed_value')
     expect(payload).not.toHaveProperty('expected_close_date')
+    expect(payload).toMatchObject({
+      next_action: 'Founder review',
+      next_action_date: '2026-08-10',
+    })
+  })
+})
+
+describe('server-side founder-readiness filtering', () => {
+  beforeEach(() => {
+    const query = {
+      select: supabaseMocks.select,
+      or: supabaseMocks.or,
+      not: supabaseMocks.not,
+      neq: supabaseMocks.neq,
+      order: supabaseMocks.order,
+      range: supabaseMocks.range,
+    }
+    supabaseMocks.from.mockReset().mockReturnValue(query)
+    supabaseMocks.select.mockReset().mockReturnValue(query)
+    supabaseMocks.or.mockReset().mockReturnValue(query)
+    supabaseMocks.not.mockReset().mockReturnValue(query)
+    supabaseMocks.neq.mockReset().mockReturnValue(query)
+    supabaseMocks.order.mockReset().mockReturnValue(query)
+    supabaseMocks.range.mockReset().mockResolvedValue({ data: [], error: null, count: 0 })
+  })
+
+  it('queries every readiness field for missing and ready views', async () => {
+    await getLeadsPage({ ...DEFAULT_LEAD_FILTERS, readiness: 'missing' })
+    const missingFilter = String(supabaseMocks.or.mock.calls[0]?.[0])
+    for (const field of [
+      'website',
+      'country',
+      'customer_segment',
+      'contact_name',
+      'email',
+      'main_pain_point',
+      'reason_mypath_is_relevant',
+      'qualification_score',
+      'next_action',
+    ]) {
+      expect(missingFilter).toContain(`${field}.is.null`)
+    }
+
+    await getLeadsPage({ ...DEFAULT_LEAD_FILTERS, readiness: 'ready' })
+    expect(supabaseMocks.not).toHaveBeenCalledTimes(9)
+    expect(supabaseMocks.neq).toHaveBeenCalledTimes(8)
   })
 })
 
@@ -187,7 +243,7 @@ describe('contextual pipeline movement', () => {
   })
 })
 
-describe('founder lead removal', () => {
+describe('safeguarded lead removal', () => {
   beforeEach(() => {
     supabaseMocks.from.mockReset()
     supabaseMocks.update.mockReset()
@@ -221,14 +277,19 @@ describe('founder lead removal', () => {
     )
   })
 
-  it('verifies permanent deletion and reports a zero-row rejection', async () => {
-    supabaseMocks.eq
-      .mockResolvedValueOnce({ error: null, count: 1 })
-      .mockResolvedValueOnce({ error: null, count: 0 })
+  it('passes the exact company name to the protected deletion function', async () => {
+    supabaseMocks.rpc
+      .mockResolvedValueOnce({ data: 1, error: null })
+      .mockResolvedValueOnce({ data: 0, error: null })
 
-    await expect(permanentlyDeleteLead('lead-1')).resolves.toBeUndefined()
-    expect(supabaseMocks.delete).toHaveBeenCalledWith({ count: 'exact' })
-    await expect(permanentlyDeleteLead('lead-2')).rejects.toThrow(
+    await expect(
+      permanentlyDeleteLead('lead-1', 'Northstar Learning'),
+    ).resolves.toBeUndefined()
+    expect(supabaseMocks.rpc).toHaveBeenCalledWith('delete_archived_lead', {
+      p_lead_id: 'lead-1',
+      p_expected_company_name: 'Northstar Learning',
+    })
+    await expect(permanentlyDeleteLead('lead-2', 'Wrong name')).rejects.toThrow(
       'The lead was not deleted',
     )
   })

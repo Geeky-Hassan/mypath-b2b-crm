@@ -58,7 +58,7 @@ export default function TeamPage() {
   )
 
   if (loading && !data) return <PageLoader label="Calculating team activity…" />
-  if (error || !data)
+  if (!data)
     return (
       <Alert tone="error" title="Team activity could not be loaded">
         {error ?? 'No team data was returned.'}
@@ -67,6 +67,11 @@ export default function TeamPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest team activity could not be refreshed">
+          {error} The last successfully loaded report remains visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow="Founder team visibility"
         title="Team operations"

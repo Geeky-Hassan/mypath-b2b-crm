@@ -65,6 +65,7 @@ import {
 import {
   STAGE_LABELS,
   TARGET_TYPE_LABELS,
+  LEAD_SOURCE_LABELS,
   type CrmTask,
   type LeadRecord,
   type Profile,
@@ -333,7 +334,7 @@ function FounderDashboard({
   const countReached = (stage: Parameters<typeof leadReachedStage>[1]) =>
     active.filter((lead) => leadReachedStage(lead, stage)).length
   const funnel = calculateFunnelCounts(active)
-  const sources = calculateBreakdown(active, (lead) => lead.source)
+  const sources = calculateBreakdown(active, (lead) => LEAD_SOURCE_LABELS[lead.source])
   const segments = calculateBreakdown(active, (lead) => lead.customer_segment)
   const countries = calculateBreakdown(active, (lead) => lead.country)
   const conversions = calculateConversionRates(active)
@@ -753,12 +754,10 @@ function LeadGeneratorDashboard({
       task.completed_at != null &&
       new Date(task.completed_at) >= completedCutoff,
   ).length
-  const missing = own.filter((lead) =>
-    missingLeadInformation(lead).some((field) => field !== 'next action'),
-  )
+  const missing = own.filter((lead) => missingLeadInformation(lead).length > 0)
   const countries = calculateBreakdown(own, (lead) => lead.country)
   const segments = calculateBreakdown(own, (lead) => lead.customer_segment)
-  const sources = calculateBreakdown(own, (lead) => lead.source)
+  const sources = calculateBreakdown(own, (lead) => LEAD_SOURCE_LABELS[lead.source])
   const rejected = own.filter(
     (lead) =>
       lead.lifecycle_status === 'lost' && /reject|unqualif/i.test(lead.lost_reason ?? ''),
@@ -871,7 +870,7 @@ function LeadGeneratorDashboard({
           label="Missing information"
           value={missing.length}
           detail="Across your active lead set"
-          help="Your leads missing at least one editable research field: website, contact name, contact email, country, or segment."
+          help="Your leads missing a Ready for Founder field: website, country, segment, contact, pain point, MyPath relevance, score, or next action."
           accent="amber"
           density="compact"
         />
@@ -1076,7 +1075,7 @@ export default function DashboardPage() {
   useAutoRefresh(refresh)
 
   if (loading && !data) return <PageLoader label="Calculating dashboard metrics…" />
-  if (error || !data || !profile || !user)
+  if (!data || !profile || !user)
     return (
       <Alert tone="error" title="Dashboard could not be loaded">
         <p>{error ?? 'Your profile is not available.'}</p>
@@ -1093,6 +1092,11 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-5">
+      {error ? (
+        <Alert tone="warning" title="Latest dashboard changes could not be refreshed">
+          {error} The last successfully loaded data remains visible.
+        </Alert>
+      ) : null}
       <PageHeader
         eyebrow={isFounder ? 'Founder sales intelligence' : 'Lead generation overview'}
         title={`Hi, ${profile.full_name.split(' ')[0]}`}

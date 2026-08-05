@@ -16,6 +16,7 @@ import {
   type StageHistory,
   type Target,
 } from '../types/domain'
+import { missingLeadInformation } from './leadReadiness'
 
 const USER_ID = '11111111-1111-4111-8111-111111111111'
 
@@ -199,5 +200,39 @@ describe('target progress', () => {
       target: 4,
       percentage: 25,
     })
+  })
+})
+
+describe('Ready for Founder', () => {
+  const readyFields: Partial<LeadRecord> = {
+    website: 'https://ready.example',
+    country: 'Pakistan',
+    customer_segment: 'Training provider',
+    contact_name: 'Alex Morgan',
+    email: 'alex@ready.example',
+    main_pain_point: 'Research is fragmented',
+    reason_mypath_is_relevant: 'MyPath consolidates the workflow',
+    qualification_score: 0,
+    next_action: 'Founder review',
+  }
+
+  it('treats score zero as complete', () => {
+    expect(missingLeadInformation(lead('ready', 'lead_added', [], readyFields))).toEqual(
+      [],
+    )
+  })
+
+  it('reports every missing readiness field consistently', () => {
+    expect(missingLeadInformation(lead('missing', 'lead_added'))).toEqual([
+      'website',
+      'country',
+      'customer segment',
+      'contact name',
+      'contact email',
+      'main pain point',
+      'why MyPath is relevant',
+      'qualification score',
+      'next action',
+    ])
   })
 })

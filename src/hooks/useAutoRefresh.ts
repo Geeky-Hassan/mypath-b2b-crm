@@ -8,6 +8,7 @@ import { useEffect, useRef } from 'react'
 export function useAutoRefresh(refresh: () => Promise<void>, intervalMs = 30_000): void {
   const refreshRef = useRef(refresh)
   const runningRef = useRef(false)
+  const lastRunRef = useRef(0)
 
   useEffect(() => {
     refreshRef.current = refresh
@@ -16,6 +17,9 @@ export function useAutoRefresh(refresh: () => Promise<void>, intervalMs = 30_000
   useEffect(() => {
     const run = async () => {
       if (runningRef.current || document.visibilityState === 'hidden') return
+      const now = Date.now()
+      if (now - lastRunRef.current < 1_000) return
+      lastRunRef.current = now
       runningRef.current = true
       try {
         await refreshRef.current()

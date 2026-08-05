@@ -1,13 +1,13 @@
 # MyPath CRM V1 Test Report
 
-Date: 2026-08-04
+Date: 2026-08-05
 
 ## Release result
 
 The application is ready for Supabase-backed staging. Static checks,
 unit/component/contract tests, and the production build pass. Production release
 remains conditional on applying all migrations through
-`202608040011_task_assignment_consistency.sql`, deploying `team-admin`, and
+`202608050012_reliability_and_lead_workflow.sql`, deploying `team-admin`, and
 completing live Founder/active/disabled/removal checks from
 [ADMIN_GUIDE.md](ADMIN_GUIDE.md).
 
@@ -18,7 +18,7 @@ completing live Founder/active/disabled/removal checks from
 | Dependency install | Pass   | `npm install` completed with lockfile present                                                                                          |
 | ESLint             | Pass   | Zero lint errors and zero allowed warnings                                                                                             |
 | TypeScript         | Pass   | Project references completed without emit or errors                                                                                    |
-| Vitest             | Pass   | 20 test files, 102 tests passed                                                                                                        |
+| Vitest             | Pass   | 22 test files, 115 tests passed                                                                                                        |
 | Prettier           | Pass   | All checked files match formatting rules                                                                                               |
 | Production build   | Pass   | Vite produced `dist/index.html` and static assets                                                                                      |
 | SPA fallback       | Pass   | Build contains `dist/index.html` and relies on Cloudflare Pages' native SPA fallback; no conflicting catch-all `_redirects` is emitted |
@@ -30,6 +30,8 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 ## Test coverage
 
 - Lead required fields, email/URL validation, date validation, lost reason, and proposed-value rules.
+- Inclusive whole-number 0–11 qualification scoring and Google/AI source values.
+- One shared Ready for Founder definition, including score zero and all nine required fields.
 - Optional phone handling, calling-country parsing, E.164 normalization, validation, and display formatting.
 - Website/email duplicate normalization and record exclusion during edits.
 - PapaParse quoting, header aliases, duplicate heading/mapping detection,
@@ -39,13 +41,15 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 - Lead Generator CSV field restriction, protected-column stripping, and Excel-ready template generation.
 - Every detailed-stage-to-funnel mapping, funnel counts, conversion denominators, lead-to-paid-pilot conversion, stage timing, sales-cycle timing, target progress, breakdowns, and missing-data behavior.
 - Founder and Lead Generator permission helpers, including archive/deal controls and the single allowed Lead Generator stage transition.
+- Silent token/focus session events, mounted unsaved input retention, background refresh state, stale-data retention, and duplicate refresh collapse.
+- Synchronized top/bottom pipeline scrolling and measured board width.
 - Protected-route return paths and founder-route denial/allow behavior.
 - Direct Founder-issued password access and account password policy/generation.
 - Login form validation, credential submission, and safe authentication errors.
 - Lead form required-field and successful minimal-create component flows.
 - Founder member-removal component flow, including exact-email confirmation and
   the sanitized Edge Function request.
-- Static RLS migration contract for authenticated lead access, financial-column isolation, database-enforced Lead Generator boundaries, founder/archive deletion, owner-scoped target reads, founder-only target writes, anonymous revocation, and trigger-owned stage history.
+- Static RLS migration contract for authenticated lead access, financial-column isolation, database-enforced Lead Generator boundaries, archived/exact-name deletion RPC, owner-scoped target reads, founder-only target writes, anonymous revocation, and trigger-owned stage history.
 - Disabled-account data blocking, assigned-task isolation, Founder task administration, and trigger-owned task history contracts.
 - Atomic Founder task deletion, explicit task-event cleanup, task-to-lead
   cascade, focus/visible-tab refresh, zero-row rejection, and surfaced database
@@ -70,12 +74,12 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 
 - No service-role key or privileged Supabase credential exists in frontend source or environment examples.
 - Browser configuration accepts only `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`.
-- Session restoration, auth-state subscription cleanup, stale profile-request protection, logout error handling, and safe post-login local redirects are implemented.
+- Initial session restoration, silent token/focus updates, auth-state subscription cleanup, stale profile-request protection, logout error handling, and safe post-login local redirects are implemented.
 - Founder-only routes have direct route guards. Navigation hiding is not treated as authorization.
 - RLS policies are scoped to `authenticated`; anonymous table and sequence grants are revoked in the hardening migration.
 - Every active CRM policy also checks Active account state; disabled users receive no CRM rows even while an old JWT exists.
-- Lead Generator permanent deletion is blocked by founder RLS and archived-state requirements.
-- Lead Generator sales/lifecycle/archive fields and later pipeline transitions are blocked by a database trigger; proposed value and expected close date are hidden by the authorised read projection.
+- Direct authenticated lead deletion is revoked. Both active roles must use the archived-state and exact-company-name RPC.
+- Lead Generator protected sales/lifecycle fields and later pipeline transitions are blocked by a database trigger; only next-action and deletion-preparation lifecycle changes were added. Proposed value and expected close date remain hidden by the authorised read projection.
 - Target writes and settings changes require founder status; target reads remain owner-scoped for Lead Generators.
 - Lead/activity provenance is immutable, settings update actors are database-stamped, and stage history is trigger-owned.
 - Accepted CSV imports are one multi-row database insert, so a database failure rolls back the accepted batch.
@@ -90,12 +94,12 @@ The test runtime in this workspace is Node 25.2.1 and emits a Node-level `--loca
 
 ## Manual checks still required
 
-- Apply all 11 migrations to a non-production Supabase project and deploy `team-admin`.
+- Back up production, verify lead/score counts, and apply all 12 migrations to a non-production Supabase project before production; deploy `team-admin`.
 - Use real Founder and Lead Generator sessions to execute every RLS check in the administrator guide.
 - Confirm valid/invalid login, refresh restoration, and logout against Supabase Auth.
 - Verify direct-login account creation, password reset, disable, reactivate, and
   permanent removal with Founder and Lead Generator sessions.
-- Execute direct task requests as a Lead Generator to prove create/reassign/delete denials.
+- Execute direct task requests as a Lead Generator to prove create/reassign/delete denials, and direct lead deletion to prove the RPC-only boundary.
 - Confirm stage moves create exactly one history record with the correct actor.
 - Force one CSV constraint failure in staging and confirm the accepted batch remains absent.
 - Run `supabase/verification/pre_import_readiness.sql`; resolve every FAIL and

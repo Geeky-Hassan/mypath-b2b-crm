@@ -21,6 +21,7 @@ import {
   Textarea,
 } from '../components/ui'
 import { useToast } from '../components/ui/ToastProvider'
+import { LeadReadinessBadge } from '../components/LeadReadinessBadge'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { downloadText, leadsToExportCsv } from '../lib/csv'
 import { findDuplicateLeads, type DuplicateMatch } from '../lib/duplicates'
@@ -56,6 +57,7 @@ import {
 import {
   ACTIVITY_TYPES,
   LEAD_PRIORITIES,
+  LEAD_SOURCE_LABELS,
   LEAD_SOURCES,
   LIFECYCLE_LABELS,
   LIFECYCLE_STATUSES,
@@ -284,8 +286,12 @@ export function LeadForm({
         <Field label="Qualification score" error={errors.qualification_score?.message}>
           <Input
             {...register('qualification_score')}
+            type="number"
+            min="0"
+            max="11"
+            step="1"
             inputMode="numeric"
-            placeholder="0-100"
+            placeholder="0-11"
           />
         </Field>
         <Field label="Priority">
@@ -301,7 +307,7 @@ export function LeadForm({
           <Select {...register('source')}>
             {LEAD_SOURCES.map((source) => (
               <option key={source} value={source}>
-                {source.charAt(0).toUpperCase() + source.slice(1)}
+                {LEAD_SOURCE_LABELS[source]}
               </option>
             ))}
           </Select>
@@ -365,10 +371,16 @@ export function LeadForm({
       ) : (
         <FormSection
           title="Lead record"
-          description="The Founder manages contact activity, follow-up, lifecycle, and deal fields."
+          description="Add the next action needed before this research is ready for the Founder."
         >
           <Field label="Date added" required error={errors.date_added?.message}>
             <Input {...register('date_added')} type="date" />
+          </Field>
+          <Field label="Next action">
+            <Input {...register('next_action')} />
+          </Field>
+          <Field label="Next action date">
+            <Input {...register('next_action_date')} type="date" />
           </Field>
         </FormSection>
       )}
@@ -528,14 +540,13 @@ function LeadDetail({
         >
           {lead.priority} priority
         </Badge>
+        <LeadReadinessBadge lead={lead} />
         <Button className="ml-auto" size="sm" variant="secondary" onClick={onEdit}>
           Edit lead
         </Button>
-        {isFounder ? (
-          <Button size="sm" variant="danger" onClick={onDelete}>
-            Delete...
-          </Button>
-        ) : null}
+        <Button size="sm" variant="danger" onClick={onDelete}>
+          Delete...
+        </Button>
         {!isFounder && lead.current_pipeline_stage === 'lead_added' ? (
           <Button size="sm" onClick={() => setQualifyOpen(true)}>
             Mark qualified
@@ -571,7 +582,7 @@ function LeadDetail({
         <Detail
           label="Qualification"
           value={
-            lead.qualification_score == null ? null : `${lead.qualification_score}/100`
+            lead.qualification_score == null ? null : `${lead.qualification_score}/11`
           }
         />
         {isFounder ? (
@@ -799,6 +810,7 @@ export default function LeadsPage() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [deleteLead, setDeleteLead] = useState<LeadRecord | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
+  const [preparedForDeletion, setPreparedForDeletion] = useState(false)
   const [actionError, setActionError] = useState<string | null>(null)
   const [working, setWorking] = useState(false)
   const [quickView, setQuickView] = useState('all')
@@ -840,7 +852,11 @@ export default function LeadsPage() {
     }
     if (view === 'missing') {
       next.creatorId = user.id
-      next.missingInfo = true
+      next.readiness = 'missing'
+    }
+    if (view === 'ready') {
+      next.creatorId = user.id
+      next.readiness = 'ready'
     }
     setFilters(next)
     setQuickView(view)
@@ -879,6 +895,7 @@ export default function LeadsPage() {
     try {
       await setLeadArchived(deleteLead.id, true)
       setDeleteLead({ ...deleteLead, lifecycle_status: 'archived' })
+      setPreparedForDeletion(true)
       setDeleteConfirmation('')
       toast({
         title: 'Lead archived. Complete the final confirmation to delete it.',
@@ -894,15 +911,36 @@ export default function LeadsPage() {
     }
   }
 
+  const restoreFromDeletion = async () => {
+    if (!deleteLead || deleteLead.lifecycle_status !== 'archived') return
+    setWorking(true)
+    setActionError(null)
+    try {
+      await setLeadArchived(deleteLead.id, false)
+      toast({ title: 'Lead restored. Permanent deletion cancelled.', tone: 'success' })
+      setDeleteLead(null)
+      setDeleteConfirmation('')
+      setPreparedForDeletion(false)
+      await refresh()
+    } catch (caught) {
+      setActionError(
+        caught instanceof Error ? caught.message : 'The lead could not be restored.',
+      )
+    } finally {
+      setWorking(false)
+    }
+  }
+
   const remove = async () => {
     if (!deleteLead || deleteConfirmation !== deleteLead.company_name) return
     setWorking(true)
     setActionError(null)
     try {
-      await permanentlyDeleteLead(deleteLead.id)
+      await permanentlyDeleteLead(deleteLead.id, deleteConfirmation)
       toast({ title: 'Lead permanently deleted.', tone: 'success' })
       setDeleteLead(null)
       setDeleteConfirmation('')
+      setPreparedForDeletion(false)
       setSelectedId(null)
       await refresh()
     } catch (caught) {
@@ -954,8 +992,8 @@ export default function LeadsPage() {
         }
       />
       {error ? (
-        <Alert tone="error" title="Could not load leads">
-          {error}
+        <Alert tone="warning" title="Latest lead changes could not be refreshed">
+          {error} The last successfully loaded leads remain visible.
         </Alert>
       ) : null}
       {actionError && !deleteLead ? <Alert tone="error">{actionError}</Alert> : null}
@@ -968,6 +1006,7 @@ export default function LeadsPage() {
             ['sourced', 'My sourced leads'],
             ['qualification', 'Needs qualification'],
             ['missing', 'Missing information'],
+            ['ready', 'Ready for Founder'],
           ].map(([value, label]) => (
             <button
               key={value}
@@ -1031,7 +1070,7 @@ export default function LeadsPage() {
             ))}
           </Select>
         </div>
-        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-7">
           <Input
             value={filters.country}
             onChange={(event) => updateFilter('country', event.target.value)}
@@ -1054,9 +1093,20 @@ export default function LeadsPage() {
             <option value="all">All sources</option>
             {LEAD_SOURCES.map((source) => (
               <option key={source} value={source}>
-                {source}
+                {LEAD_SOURCE_LABELS[source]}
               </option>
             ))}
+          </Select>
+          <Select
+            value={filters.readiness}
+            onChange={(event) =>
+              updateFilter('readiness', event.target.value as LeadFilters['readiness'])
+            }
+            aria-label="Filter by founder readiness"
+          >
+            <option value="all">All readiness states</option>
+            <option value="ready">Ready for Founder</option>
+            <option value="missing">Missing information</option>
           </Select>
           <Select
             value={filters.priority}
@@ -1117,6 +1167,7 @@ export default function LeadsPage() {
               <th className="px-4 py-3">Stage</th>
               <th className="px-4 py-3">Owner</th>
               <th className="px-4 py-3">Priority</th>
+              <th className="px-4 py-3">Founder readiness</th>
               <th className="px-4 py-3">Next action</th>
               {isFounder ? <th className="px-4 py-3">Value</th> : null}
               <th className="px-4 py-3 text-right">Actions</th>
@@ -1162,6 +1213,9 @@ export default function LeadsPage() {
                     {lead.priority}
                   </Badge>
                 </td>
+                <td className="px-4 py-3">
+                  <LeadReadinessBadge lead={lead} />
+                </td>
                 <td className="px-4 py-3 text-slate-600">
                   <p>{lead.next_action || '—'}</p>
                   <p className="text-xs text-slate-400">
@@ -1188,19 +1242,18 @@ export default function LeadsPage() {
                         {lead.lifecycle_status === 'archived' ? 'Restore' : 'Archive'}
                       </Button>
                     ) : null}
-                    {isFounder ? (
-                      <Button
-                        size="sm"
-                        variant="danger"
-                        onClick={() => {
-                          setDeleteLead(lead)
-                          setDeleteConfirmation('')
-                          setActionError(null)
-                        }}
-                      >
-                        Delete...
-                      </Button>
-                    ) : null}
+                    <Button
+                      size="sm"
+                      variant="danger"
+                      onClick={() => {
+                        setDeleteLead(lead)
+                        setDeleteConfirmation('')
+                        setPreparedForDeletion(false)
+                        setActionError(null)
+                      }}
+                    >
+                      Delete...
+                    </Button>
                   </div>
                 </td>
               </tr>
@@ -1277,6 +1330,7 @@ export default function LeadsPage() {
             onDelete={() => {
               setDeleteLead(selected)
               setDeleteConfirmation('')
+              setPreparedForDeletion(false)
               setActionError(null)
               setSelectedId(null)
             }}
@@ -1290,6 +1344,7 @@ export default function LeadsPage() {
         onClose={() => {
           setDeleteLead(null)
           setDeleteConfirmation('')
+          setPreparedForDeletion(false)
           setActionError(null)
         }}
         title="Permanently delete lead"
@@ -1338,8 +1393,12 @@ export default function LeadsPage() {
                 />
               </Field>
               <div className="flex justify-end gap-3">
-                <Button variant="secondary" onClick={() => setDeleteLead(null)}>
-                  Cancel
+                <Button
+                  variant="secondary"
+                  loading={working}
+                  onClick={() => void restoreFromDeletion()}
+                >
+                  {preparedForDeletion ? 'Restore and cancel' : 'Restore lead'}
                 </Button>
                 <Button
                   variant="danger"

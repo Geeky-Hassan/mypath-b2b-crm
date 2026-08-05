@@ -32,7 +32,15 @@ export const LIFECYCLE_STATUSES = [
 ] as const
 
 export const LEAD_PRIORITIES = ['low', 'medium', 'high'] as const
-export const LEAD_SOURCES = ['email', 'linkedin', 'referral', 'event', 'other'] as const
+export const LEAD_SOURCES = [
+  'email',
+  'linkedin',
+  'google',
+  'ai',
+  'referral',
+  'event',
+  'other',
+] as const
 export const ACTIVITY_TYPES = [
   'note',
   'email',
@@ -77,6 +85,16 @@ export type UserRole = 'founder' | 'lead_generator'
 export type AccountStatus = (typeof ACCOUNT_STATUSES)[number]
 export type TaskStatus = (typeof TASK_STATUSES)[number]
 export type TaskType = (typeof TASK_TYPES)[number]
+
+export const LEAD_SOURCE_LABELS: Record<LeadSource, string> = {
+  email: 'Email',
+  linkedin: 'LinkedIn',
+  google: 'Google',
+  ai: 'AI',
+  referral: 'Referral',
+  event: 'Event',
+  other: 'Other',
+}
 
 export interface Profile {
   id: string
@@ -300,7 +318,7 @@ export interface LeadFilters {
   source: LeadSource | 'all'
   ownerId: string
   creatorId: string
-  missingInfo: boolean
+  readiness: 'all' | 'ready' | 'missing'
   priority: LeadPriority | 'all'
   sortBy: LeadSortField
   sortDirection: 'asc' | 'desc'
