@@ -8,7 +8,7 @@ An internal, desktop-first CRM for MyPath. The Founder and authorised Lead Gener
 - React Router
 - Supabase Auth, Postgres, and Row Level Security
 - React Hook Form and Zod
-- PapaParse for CSV import/export
+- PapaParse for CSV handling and fflate for asynchronous ZIP exports
 - libphonenumber-js for optional international contact phones
 - dnd-kit for accessible pipeline movement
 - Recharts for focused dashboard visualizations
@@ -46,7 +46,7 @@ After Supabase setup, run `npm run dev`, open the printed `http://localhost:5173
 1. Sign in as a Lead Generator created from **Settings > Users & access**, review **My focus**, add a lead with an optional international phone and next action, bulk-import a small CSV, complete an assigned task, move Lead Added to Qualified, and exercise the safeguarded archive-confirm-delete flow. Confirm deal values, export, Team, and Settings remain unavailable.
 2. Sign in as Noor, add contact activity and a next action, move the lead through later stages, enter a proposed value for proposal/negotiation, mark a test lead lost with a reason, and archive/restore/delete an archived test lead.
 3. Create one weekly and one monthly target; confirm the Lead Generator sees only personal targets and Noor sees both users.
-4. Import a small template CSV, review mapping/invalid/duplicate states, export the filtered Leads view, and open the CSV in a spreadsheet.
+4. Import a small template CSV, review mapping/invalid/duplicate states, export the filtered Leads view, and open all three CSV files from the ZIP in a spreadsheet.
 5. Create a Lead Generator in **Settings > Users & access**, copy the generated credentials, verify direct login, then disable/reactivate access and refresh every application route.
 
 Run the complete automated gate before accepting a change:
@@ -243,13 +243,21 @@ An example-free version is available at
 Open it in Excel and save as **CSV UTF-8** before upload. Lead Generator imports
 accept only permitted research, contact, qualification, owner, next-action, date, and notes
 fields, and always create Active records at Lead Added. Forbidden columns are
-stripped even if manually supplied. Filtered/full export remains Founder-only.
+stripped even if manually supplied. Filtered, milestone, and full rich export remains
+Founder-only. The ZIP includes current lead data, all activities for the selected leads,
+and their complete recorded stage history.
 CSV is the only spreadsheet exchange in V1—there is no native `.xlsx` parsing or
 live Excel synchronization.
 
 ## Backup and export guidance
 
-CSV export is useful for reporting and portability, but it is not a full backup: activities, stage history, profiles, targets, settings, Auth users, and audit relationships are not included. Before migrations or bulk work, use the backup or PostgreSQL dump workflow supported by the Supabase project. Test restoration into a separate project periodically. See the [administrator guide](docs/ADMIN_GUIDE.md) for the recovery checklist.
+The rich ZIP export is useful for reporting and portability, but it is not a full
+backup. It includes leads, their activities, and their stage history; it does not
+include complete profiles, tasks, targets, settings, Auth users, or every database
+relationship. Before migrations or bulk work, use the backup or PostgreSQL dump
+workflow supported by the Supabase project. Test restoration into a separate project
+periodically. See the [administrator guide](docs/ADMIN_GUIDE.md) for the recovery
+checklist.
 
 Before a large import, apply migration 12, take a Supabase database backup, and
 run [`supabase/verification/pre_import_readiness.sql`](supabase/verification/pre_import_readiness.sql)
@@ -271,6 +279,5 @@ policy failure rolls back the complete accepted batch.
 - [Administrator guide](docs/ADMIN_GUIDE.md)
 - [Cloudflare Pages deployment](docs/CLOUDFLARE_DEPLOYMENT.md)
 - [V1 test report](docs/TEST_REPORT.md)
-
 
 test data

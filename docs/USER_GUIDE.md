@@ -99,7 +99,13 @@ Lead Generators should use the Excel-ready template and save it as **CSV UTF-8**
 Only permitted research, qualification, and next-action fields are mapped; imported leads
 always start Active at Lead Added. Invalid rows are skipped before confirmation.
 Duplicate-warning rows are skipped unless included. A blank owner email assigns
-the importer. Founders can export filtered data from **Leads** or all leads from
-**Bulk import**.
+the importer. Founders can choose **Export leads** on the Leads page, preserve the
+current non-stage filters or start from all leads, then select an exact current stage
+or a reached milestone. **Bulk import** provides the same complete package for all
+leads. Both routes download a dated ZIP with `leads.csv`, `activities.csv`, and
+`stage-history.csv`.
 
-CSV export is a working-data extract, not a complete database backup: it does not contain profiles, activities, stage history, targets, settings, or Auth accounts.
+The ZIP export is a working-data extract, not a complete database backup. It includes
+lead fields, related activities, stage movements, and displayed actor details, but it
+does not contain complete profiles, tasks, targets, settings, Auth accounts, or every
+database relationship.

@@ -114,6 +114,17 @@ if any accepted row fails a policy or constraint, none of the accepted rows are
 committed, and the client also rejects a response that does not confirm the full
 expected row count.
 
+Founder exports are built entirely in the browser from existing `crm_leads` records.
+The same shared builder flattens selected leads, activities, and stage history into
+formula-safe, BOM-prefixed CRLF CSV files, then fflate creates the ZIP asynchronously.
+Filtering changes only which already-readable records are included; export performs no
+database writes.
+
 ## Verification surface
 
-Vitest covers the shared lead schema, CSV parsing, duplicate normalization, atomic import persistence, role helpers, route guards, authentication errors, important form behavior, display-format safety, all stage-to-funnel mappings, funnel counts, conversion denominator behavior, sales-cycle duration, time-in-stage intervals, and target progress. ESLint, TypeScript, Prettier, and the Vite production build remain required before handoff.
+Vitest covers the shared lead schema, CSV parsing, rich ZIP export and milestone
+matching, duplicate normalization, atomic import persistence, role helpers, route
+guards, authentication errors, important form and drawer behavior, display-format
+safety, all stage-to-funnel mappings, funnel counts, conversion denominator behavior,
+sales-cycle duration, time-in-stage intervals, and target progress. ESLint, TypeScript,
+Prettier, and the Vite production build remain required before handoff.

@@ -23,7 +23,6 @@ import {
   autoMapColumns,
   downloadText,
   importReportCsv,
-  leadsToExportCsv,
   mapCsvRecord,
   mappingConflicts,
   parseCsvText,
@@ -35,6 +34,7 @@ import {
 } from '../lib/csv'
 import { findDuplicateLeads, type DuplicateCandidate } from '../lib/duplicates'
 import { dateInputValue } from '../lib/format'
+import { downloadLeadExport } from '../lib/leadExport'
 import {
   leadFormSchema,
   leadGeneratorLeadFormSchema,
@@ -333,8 +333,13 @@ export default function ImportPage() {
     setMessage(null)
     try {
       const leads = await getAllLeads()
-      downloadText(`mypath-leads-${dateInputValue()}.csv`, leadsToExportCsv(leads))
-      toast({ title: 'CRM lead export created.', tone: 'success' })
+      if (!leads.length) throw new Error('There are no leads to export.')
+      await downloadLeadExport(leads)
+      toast({
+        title: 'Complete CRM lead export created.',
+        description: `${leads.length} leads with activities and stage history.`,
+        tone: 'success',
+      })
     } catch (caught) {
       setMessage({
         tone: 'error',
@@ -481,8 +486,8 @@ export default function ImportPage() {
             <Badge tone="blue">Export</Badge>
             <h2 className="mt-3 text-base font-bold text-slate-950">Export CRM leads</h2>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
-              Download all leads here. Use Export filtered on the Leads page to preserve
-              the current search and filters.
+              Download all leads, activities, and stage history in one ZIP. Use Export
+              leads on the Leads page for filtered or milestone-based exports.
             </p>
             <Button
               className="mt-5"
@@ -490,7 +495,7 @@ export default function ImportPage() {
               loading={importing}
               onClick={() => void exportAll()}
             >
-              Export all leads
+              Export complete lead data
             </Button>
           </Card>
         ) : null}

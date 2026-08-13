@@ -149,10 +149,10 @@ Use Founder and Lead Generator test sessions through the browser or Supabase Jav
 
 - Use CRM archive for recoverable removal. Permanent lead deletion cascades to
   activities, stage history, linked tasks, and their task events.
-- Treat CSV export as a portability/reporting extract, not a full backup.
+- Treat the rich lead/activity/stage-history ZIP as a portability/reporting extract, not a full backup.
 - Before migrations or bulk imports, take a database backup using the Supabase-supported backup or PostgreSQL dump workflow available for the project.
 - Periodically test a restore into a separate project. A backup is not proven until restoration is verified.
-- Keep Auth users and database data in the same recovery plan; a leads-only CSV cannot reconstruct user IDs or audit ownership.
+- Keep Auth users and database data in the same recovery plan; the export's actor labels cannot reconstruct Auth identities, complete profiles, or every audit relationship.
 - After migration 12 and before bulk import, run the read-only
   `supabase/verification/pre_import_readiness.sql` query. Resolve all `FAIL`
   results and review duplicate/disabled-owner `WARNING` results.

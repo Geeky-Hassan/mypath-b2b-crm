@@ -23,16 +23,14 @@ import {
 import { useToast } from '../components/ui/ToastProvider'
 import { LeadReadinessBadge } from '../components/LeadReadinessBadge'
 import { useAsyncData } from '../hooks/useAsyncData'
-import { downloadText, leadsToExportCsv } from '../lib/csv'
 import { friendlyLeadSaveError, logCrmError } from '../lib/crmErrors'
 import { findDuplicateLeads, type DuplicateMatch } from '../lib/duplicates'
+import { formatDate, formatDateTime, formatMoney, stageLabel } from '../lib/format'
 import {
-  dateInputValue,
-  formatDate,
-  formatDateTime,
-  formatMoney,
-  stageLabel,
-} from '../lib/format'
+  downloadLeadExport,
+  filterLeadsForExport,
+  type ExportStageMatch,
+} from '../lib/leadExport'
 import {
   leadFormSchema,
   leadGeneratorLeadFormSchema,
@@ -66,6 +64,7 @@ import {
   type ActivityType,
   type LeadFilters,
   type LeadRecord,
+  type PipelineStage,
   type Profile,
 } from '../types/domain'
 
@@ -77,6 +76,8 @@ const activitySchema = z.object({
 })
 
 type ActivityValues = z.infer<typeof activitySchema>
+type LeadDetailTab = 'overview' | 'activity' | 'history'
+type LeadExportScope = 'filtered' | 'all'
 
 function toneForStage(stage: LeadRecord['current_pipeline_stage']) {
   if (stage === 'paid_pilot_won' || stage === 'recurring_contract_won') {
@@ -90,6 +91,17 @@ function toneForStage(stage: LeadRecord['current_pipeline_stage']) {
 
 function labelForActivity(type: ActivityType): string {
   return type.charAt(0).toUpperCase() + type.slice(1)
+}
+
+function externalHref(value: string | null | undefined): string | null {
+  if (!value?.trim()) return null
+  const candidate = /^https?:\/\//i.test(value) ? value : `https://${value}`
+  try {
+    const url = new URL(candidate)
+    return url.protocol === 'http:' || url.protocol === 'https:' ? url.href : null
+  } catch {
+    return null
+  }
 }
 
 function FormSection({
@@ -418,7 +430,7 @@ export function LeadForm({
   )
 }
 
-function LeadDetail({
+export function LeadDetail({
   lead,
   currency,
   currentUserId,
@@ -435,7 +447,10 @@ function LeadDetail({
   onDelete: () => void
   onRefresh: () => Promise<void>
 }) {
+  const websiteHref = externalHref(lead.website)
+  const linkedInHref = externalHref(lead.linkedin_url)
   const [error, setError] = useState<string | null>(null)
+  const [activeTab, setActiveTab] = useState<LeadDetailTab>('overview')
   const [qualifying, setQualifying] = useState(false)
   const [qualifyOpen, setQualifyOpen] = useState(false)
   const [qualificationContext, setQualificationContext] = useState('')
@@ -456,6 +471,8 @@ function LeadDetail({
       notes: '',
     },
   })
+
+  useEffect(() => setActiveTab('overview'), [lead.id])
 
   const submitActivity = async (values: ActivityValues) => {
     setError(null)
@@ -556,171 +573,294 @@ function LeadDetail({
         ) : null}
       </div>
 
-      <Card className="grid gap-5 p-5 sm:grid-cols-2">
-        <Detail label="Primary contact" value={lead.contact_name} />
-        <Detail label="Email" value={lead.email} />
-        <div>
-          <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
-            Contact phone
-          </p>
-          {lead.contact_phone ? (
-            <a
-              className="mt-1 inline-block text-sm font-medium text-blue-700 hover:text-blue-800"
-              href={`tel:${lead.contact_phone}`}
-            >
-              {formatPhone(lead.contact_phone)}
-            </a>
-          ) : (
-            <p className="mt-1 text-sm font-medium text-slate-800">—</p>
-          )}
-        </div>
-        <Detail label="Website" value={lead.website} />
-        <Detail
-          label="Country / region"
-          value={[lead.country, lead.region].filter(Boolean).join(' · ')}
-        />
-        <Detail label="Segment" value={lead.customer_segment} />
-        <Detail label="Owner" value={lead.owner?.full_name} />
-        <Detail
-          label="Qualification"
-          value={
-            lead.qualification_score == null ? null : `${lead.qualification_score}/11`
-          }
-        />
-        {isFounder ? (
-          <Detail
-            label="Proposed value"
-            value={formatMoney(lead.proposed_value, currency)}
-          />
-        ) : null}
-        <Detail label="Next action" value={lead.next_action} />
-        <Detail label="Next action date" value={formatDate(lead.next_action_date)} />
-      </Card>
+      <div
+        className="flex gap-1 rounded-lg border border-blue-100 bg-slate-50 p-1"
+        role="tablist"
+        aria-label="Lead details"
+      >
+        {[
+          ['overview', 'Overview'],
+          ['activity', `Activity (${lead.activities?.length ?? 0})`],
+          ['history', `Stage history (${lead.stage_history?.length ?? 0})`],
+        ].map(([value, label]) => (
+          <button
+            key={value}
+            id={`lead-${lead.id}-${value}-tab`}
+            type="button"
+            role="tab"
+            aria-selected={activeTab === value}
+            aria-controls={`lead-${lead.id}-${value}-panel`}
+            className={`rounded-md px-3 py-2 text-xs font-semibold transition ${activeTab === value ? 'bg-blue-600 text-white' : 'text-slate-600 hover:bg-white hover:text-blue-700'}`}
+            onClick={() => setActiveTab(value as LeadDetailTab)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
 
-      <section>
-        <h3 className="font-bold text-slate-950">Lead notes</h3>
-        <p className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">
-          {lead.notes || 'No working notes have been added.'}
-        </p>
-      </section>
-
-      <section className="space-y-4">
-        <div>
-          <h3 className="font-bold text-slate-950">Activity timeline</h3>
-          <p className="mt-1 text-xs text-slate-500">
-            Log calls, emails, meetings, demos, and notes.
-          </p>
-        </div>
-        <form
-          className="space-y-3 rounded-xl border border-slate-200 p-4"
-          onSubmit={handleSubmit(submitActivity)}
+      {activeTab === 'overview' ? (
+        <div
+          id={`lead-${lead.id}-overview-panel`}
+          role="tabpanel"
+          aria-labelledby={`lead-${lead.id}-overview-tab`}
+          className="space-y-5"
         >
-          <div className="grid gap-3 sm:grid-cols-2">
-            <Field label="Type">
-              <Select {...register('activity_type')}>
-                {ACTIVITY_TYPES.map((type) => (
-                  <option key={type} value={type}>
-                    {labelForActivity(type)}
-                  </option>
-                ))}
-              </Select>
-            </Field>
-            <Field label="Date" error={errors.activity_date?.message}>
-              <Input {...register('activity_date')} type="datetime-local" />
-            </Field>
+          <Card className="grid gap-5 p-5 sm:grid-cols-2">
+            <Detail label="Primary contact" value={lead.contact_name} />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Email
+              </p>
+              {lead.email ? (
+                <a
+                  className="mt-1 inline-block text-sm font-medium text-blue-700 hover:text-blue-800"
+                  href={`mailto:${lead.email}`}
+                >
+                  {lead.email}
+                </a>
+              ) : (
+                <p className="mt-1 text-sm font-medium text-slate-800">—</p>
+              )}
+            </div>
+            <Detail label="Job title" value={lead.job_title} />
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Contact phone
+              </p>
+              {lead.contact_phone ? (
+                <a
+                  className="mt-1 inline-block text-sm font-medium text-blue-700 hover:text-blue-800"
+                  href={`tel:${lead.contact_phone}`}
+                >
+                  {formatPhone(lead.contact_phone)}
+                </a>
+              ) : (
+                <p className="mt-1 text-sm font-medium text-slate-800">—</p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                Website
+              </p>
+              {websiteHref ? (
+                <a
+                  className="mt-1 inline-block break-all text-sm font-medium text-blue-700 hover:text-blue-800"
+                  href={websiteHref}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {lead.website}
+                </a>
+              ) : (
+                <p className="mt-1 break-all text-sm font-medium text-slate-800">
+                  {lead.website || '—'}
+                </p>
+              )}
+            </div>
+            <div>
+              <p className="text-xs font-semibold uppercase tracking-wide text-slate-400">
+                LinkedIn
+              </p>
+              {linkedInHref ? (
+                <a
+                  className="mt-1 inline-block break-all text-sm font-medium text-blue-700 hover:text-blue-800"
+                  href={linkedInHref}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  {lead.linkedin_url}
+                </a>
+              ) : (
+                <p className="mt-1 break-all text-sm font-medium text-slate-800">
+                  {lead.linkedin_url || '—'}
+                </p>
+              )}
+            </div>
+            <Detail
+              label="Country / region"
+              value={[lead.country, lead.region].filter(Boolean).join(' · ')}
+            />
+            <Detail label="Segment" value={lead.customer_segment} />
+            <Detail label="Company size" value={lead.company_size} />
+            <Detail label="Education offering" value={lead.education_offering} />
+            <Detail label="Current LMS or tools" value={lead.current_lms_or_tools} />
+            <Detail label="Decision-maker status" value={lead.decision_maker_status} />
+            <Detail label="Owner" value={lead.owner?.full_name} />
+            <Detail label="Created by" value={lead.creator?.full_name} />
+            <Detail
+              label="Qualification"
+              value={
+                lead.qualification_score == null ? null : `${lead.qualification_score}/11`
+              }
+            />
+            {isFounder ? (
+              <Detail
+                label="Proposed value"
+                value={formatMoney(lead.proposed_value, currency)}
+              />
+            ) : null}
+            <Detail label="Next action" value={lead.next_action} />
+            <Detail label="Next action date" value={formatDate(lead.next_action_date)} />
+            <Detail label="First contacted" value={formatDate(lead.first_contacted_at)} />
+            <Detail label="Last contacted" value={formatDate(lead.last_contacted_at)} />
+            <Detail label="Demo date" value={formatDate(lead.demo_date)} />
+            {isFounder ? (
+              <Detail
+                label="Expected close date"
+                value={formatDate(lead.expected_close_date)}
+              />
+            ) : null}
+            <Detail label="Main pain point" value={lead.main_pain_point} />
+            <Detail
+              label="Why MyPath is relevant"
+              value={lead.reason_mypath_is_relevant}
+            />
+            <Detail label="Current alternative" value={lead.current_alternative} />
+            <Detail label="Budget indicator" value={lead.budget_indicator} />
+            {lead.lifecycle_status === 'lost' ? (
+              <Detail label="Lost reason" value={lead.lost_reason} />
+            ) : null}
+          </Card>
+
+          <section>
+            <h3 className="font-bold text-slate-950">Lead notes</h3>
+            <p className="mt-2 whitespace-pre-wrap rounded-lg bg-slate-50 p-4 text-sm leading-6 text-slate-600">
+              {lead.notes || 'No working notes have been added.'}
+            </p>
+          </section>
+        </div>
+      ) : null}
+
+      {activeTab === 'activity' ? (
+        <section
+          id={`lead-${lead.id}-activity-panel`}
+          className="space-y-4"
+          role="tabpanel"
+          aria-labelledby={`lead-${lead.id}-activity-tab`}
+        >
+          <div>
+            <h3 className="font-bold text-slate-950">Activity timeline</h3>
+            <p className="mt-1 text-xs text-slate-500">
+              Log calls, emails, meetings, demos, and notes.
+            </p>
           </div>
-          <Field label="Summary" error={errors.summary?.message}>
-            <Input {...register('summary')} placeholder="What happened?" />
-          </Field>
-          <Field label="Detail">
-            <Textarea {...register('notes')} rows={2} />
-          </Field>
-          <Button size="sm" type="submit" loading={isSubmitting}>
-            Add activity
-          </Button>
-        </form>
-        {lead.activities?.length ? (
-          <ol className="space-y-3">
-            {lead.activities.map((activity) => (
-              <li key={activity.id} className="rounded-xl border border-slate-200 p-4">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <Badge tone="blue">
-                        {labelForActivity(activity.activity_type)}
-                      </Badge>
-                      <span className="text-xs text-slate-400">
-                        {formatDate(activity.activity_date)}
-                      </span>
+          <form
+            className="space-y-3 rounded-xl border border-slate-200 p-4"
+            onSubmit={handleSubmit(submitActivity)}
+          >
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="Type">
+                <Select {...register('activity_type')}>
+                  {ACTIVITY_TYPES.map((type) => (
+                    <option key={type} value={type}>
+                      {labelForActivity(type)}
+                    </option>
+                  ))}
+                </Select>
+              </Field>
+              <Field label="Date" error={errors.activity_date?.message}>
+                <Input {...register('activity_date')} type="datetime-local" />
+              </Field>
+            </div>
+            <Field label="Summary" error={errors.summary?.message}>
+              <Input {...register('summary')} placeholder="What happened?" />
+            </Field>
+            <Field label="Detail">
+              <Textarea {...register('notes')} rows={2} />
+            </Field>
+            <Button size="sm" type="submit" loading={isSubmitting}>
+              Add activity
+            </Button>
+          </form>
+          {lead.activities?.length ? (
+            <ol className="space-y-3">
+              {lead.activities.map((activity) => (
+                <li key={activity.id} className="rounded-xl border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Badge tone="blue">
+                          {labelForActivity(activity.activity_type)}
+                        </Badge>
+                        <span className="text-xs text-slate-400">
+                          {formatDate(activity.activity_date)}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-semibold text-slate-900">
+                        {activity.summary}
+                      </p>
+                      {activity.notes ? (
+                        <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
+                          {activity.notes}
+                        </p>
+                      ) : null}
+                      <p className="mt-2 text-xs text-slate-400">
+                        {activity.creator?.full_name ?? 'CRM user'}
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm font-semibold text-slate-900">
-                      {activity.summary}
+                    {isFounder || activity.created_by === currentUserId ? (
+                      <button
+                        type="button"
+                        className="text-xs font-semibold text-red-600 hover:text-red-700"
+                        onClick={() => void removeActivity(activity.id)}
+                      >
+                        Remove
+                      </button>
+                    ) : null}
+                  </div>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="text-sm text-slate-500">No activities yet.</p>
+          )}
+        </section>
+      ) : null}
+
+      {activeTab === 'history' ? (
+        <section
+          id={`lead-${lead.id}-history-panel`}
+          role="tabpanel"
+          aria-labelledby={`lead-${lead.id}-history-tab`}
+        >
+          <h3 className="font-bold text-slate-950">Stage-change history</h3>
+          {lead.stage_history?.length ? (
+            <ol className="mt-3 space-y-3">
+              {lead.stage_history.map((event) => (
+                <li
+                  key={event.id}
+                  className="flex items-start justify-between gap-4 border-l-2 border-blue-200 pl-4 text-sm"
+                >
+                  <div>
+                    <p className="font-medium text-slate-800">
+                      {event.previous_stage
+                        ? `${stageLabel(event.previous_stage)} → `
+                        : 'Started at '}
+                      {stageLabel(event.new_stage)}
                     </p>
-                    {activity.notes ? (
-                      <p className="mt-1 whitespace-pre-wrap text-sm text-slate-600">
-                        {activity.notes}
+                    <p className="text-xs text-slate-500">
+                      {event.actor?.full_name ?? 'CRM user'}
+                    </p>
+                    <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
+                      {event.description || 'No stage context was recorded.'}
+                    </p>
+                    {event.follow_up_required ? (
+                      <p className="mt-1 text-xs font-semibold text-amber-700">
+                        Follow-up required on {formatDate(event.follow_up_date)}
                       </p>
                     ) : null}
-                    <p className="mt-2 text-xs text-slate-400">
-                      {activity.creator?.full_name ?? 'CRM user'}
-                    </p>
                   </div>
-                  {isFounder || activity.created_by === currentUserId ? (
-                    <button
-                      type="button"
-                      className="text-xs font-semibold text-red-600 hover:text-red-700"
-                      onClick={() => void removeActivity(activity.id)}
-                    >
-                      Remove
-                    </button>
-                  ) : null}
-                </div>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="text-sm text-slate-500">No activities yet.</p>
-        )}
-      </section>
-
-      <section>
-        <h3 className="font-bold text-slate-950">Stage-change history</h3>
-        {lead.stage_history?.length ? (
-          <ol className="mt-3 space-y-3">
-            {lead.stage_history.map((event) => (
-              <li
-                key={event.id}
-                className="flex items-start justify-between gap-4 border-l-2 border-blue-200 pl-4 text-sm"
-              >
-                <div>
-                  <p className="font-medium text-slate-800">
-                    {event.previous_stage
-                      ? `${stageLabel(event.previous_stage)} → `
-                      : 'Started at '}
-                    {stageLabel(event.new_stage)}
-                  </p>
-                  <p className="text-xs text-slate-500">
-                    {event.actor?.full_name ?? 'CRM user'}
-                  </p>
-                  <p className="mt-1 whitespace-pre-wrap text-xs leading-5 text-slate-600">
-                    {event.description || 'No stage context was recorded.'}
-                  </p>
-                  {event.follow_up_required ? (
-                    <p className="mt-1 text-xs font-semibold text-amber-700">
-                      Follow-up required on {formatDate(event.follow_up_date)}
-                    </p>
-                  ) : null}
-                </div>
-                <time className="shrink-0 text-xs text-slate-500">
-                  {formatDateTime(event.changed_at)}
-                </time>
-              </li>
-            ))}
-          </ol>
-        ) : (
-          <p className="mt-2 text-sm text-slate-500">No stage changes recorded yet.</p>
-        )}
-      </section>
+                  <time className="shrink-0 text-xs text-slate-500">
+                    {formatDateTime(event.changed_at)}
+                  </time>
+                </li>
+              ))}
+            </ol>
+          ) : (
+            <p className="mt-2 text-sm text-slate-500">No stage changes recorded yet.</p>
+          )}
+        </section>
+      ) : null}
 
       <Modal
         open={qualifyOpen}
@@ -810,6 +950,11 @@ export default function LeadsPage() {
   const [filters, setFilters] = useState<LeadFilters>(DEFAULT_LEAD_FILTERS)
   const [formLead, setFormLead] = useState<LeadRecord | null | 'new'>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [exportOpen, setExportOpen] = useState(false)
+  const [exportScope, setExportScope] = useState<LeadExportScope>('filtered')
+  const [exportStage, setExportStage] = useState<PipelineStage | 'all'>('all')
+  const [exportStageMatch, setExportStageMatch] = useState<ExportStageMatch>('current')
+  const [exportError, setExportError] = useState<string | null>(null)
   const [deleteLead, setDeleteLead] = useState<LeadRecord | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [preparedForDeletion, setPreparedForDeletion] = useState(false)
@@ -954,15 +1099,42 @@ export default function LeadsPage() {
     }
   }
 
-  const exportFiltered = async () => {
-    setWorking(true)
+  const openExport = () => {
     setActionError(null)
+    setExportError(null)
+    setExportScope('filtered')
+    setExportStage(filters.stage)
+    setExportStageMatch('current')
+    setExportOpen(true)
+  }
+
+  const runExport = async () => {
+    setWorking(true)
+    setExportError(null)
     try {
-      const leads = await getAllLeads({ ...filters, page: 1 })
-      downloadText(`mypath-leads-${dateInputValue()}.csv`, leadsToExportCsv(leads))
-      toast({ title: 'Filtered leads exported.', tone: 'success' })
+      const exportFilters =
+        exportScope === 'filtered'
+          ? { ...filters, stage: 'all' as const, page: 1 }
+          : { ...DEFAULT_LEAD_FILTERS, stage: 'all' as const, page: 1 }
+      const candidates = await getAllLeads(exportFilters)
+      const leads = filterLeadsForExport(candidates, {
+        stage: exportStage,
+        stageMatch: exportStageMatch,
+      })
+      if (!leads.length) {
+        throw new Error(
+          'No leads match these export options. Adjust the filters and try again.',
+        )
+      }
+      await downloadLeadExport(leads)
+      setExportOpen(false)
+      toast({
+        title: 'Complete lead export created.',
+        description: `${leads.length} leads with activities and stage history.`,
+        tone: 'success',
+      })
     } catch (caught) {
-      setActionError(
+      setExportError(
         caught instanceof Error ? caught.message : 'The export could not be created.',
       )
     } finally {
@@ -981,12 +1153,8 @@ export default function LeadsPage() {
         action={
           <div className="flex gap-2">
             {isFounder ? (
-              <Button
-                variant="secondary"
-                onClick={() => void exportFiltered()}
-                loading={working}
-              >
-                Export filtered
+              <Button variant="secondary" onClick={openExport} loading={working}>
+                Export leads
               </Button>
             ) : null}
             <Button onClick={() => setFormLead('new')}>Add lead</Button>
@@ -1179,13 +1347,7 @@ export default function LeadsPage() {
             {data.page.leads.map((lead) => (
               <tr key={lead.id} className="hover:bg-slate-50/70">
                 <td className="px-4 py-3">
-                  <button
-                    type="button"
-                    className="text-left font-semibold text-slate-900 hover:text-blue-700"
-                    onClick={() => setSelectedId(lead.id)}
-                  >
-                    {lead.company_name}
-                  </button>
+                  <p className="font-semibold text-slate-900">{lead.company_name}</p>
                   <p className="mt-0.5 text-xs text-slate-400">
                     {lead.country || lead.website || 'No market detail'}
                   </p>
@@ -1231,6 +1393,13 @@ export default function LeadsPage() {
                 ) : null}
                 <td className="px-4 py-3">
                   <div className="flex justify-end gap-2">
+                    <Button
+                      size="sm"
+                      variant="secondary"
+                      onClick={() => setSelectedId(lead.id)}
+                    >
+                      View details
+                    </Button>
                     <Button size="sm" variant="ghost" onClick={() => setFormLead(lead)}>
                       Edit
                     </Button>
@@ -1288,6 +1457,84 @@ export default function LeadsPage() {
           </Button>
         </div>
       </div>
+
+      <Modal
+        open={exportOpen}
+        onClose={() => {
+          if (working) return
+          setExportOpen(false)
+          setExportError(null)
+        }}
+        title="Export leads"
+        description="Download lead details, activity updates, and stage history in one ZIP."
+        size="md"
+      >
+        <div className="space-y-4">
+          {exportError ? <Alert tone="error">{exportError}</Alert> : null}
+          <Field
+            label="Lead scope"
+            hint="Current filters include search, lifecycle, owner, country, segment, source, readiness, priority, and sorting."
+          >
+            <Select
+              value={exportScope}
+              onChange={(event) => setExportScope(event.target.value as LeadExportScope)}
+            >
+              <option value="filtered">Use current Leads-page filters</option>
+              <option value="all">All CRM leads</option>
+            </Select>
+          </Field>
+          <Field label="Pipeline stage">
+            <Select
+              value={exportStage}
+              onChange={(event) =>
+                setExportStage(event.target.value as PipelineStage | 'all')
+              }
+            >
+              <option value="all">All stages</option>
+              {PIPELINE_STAGES.map((stage) => (
+                <option key={stage} value={stage}>
+                  {stageLabel(stage)}
+                </option>
+              ))}
+            </Select>
+          </Field>
+          <Field
+            label="Stage match"
+            hint={
+              exportStage === 'all'
+                ? 'Choose a pipeline stage to use stage matching.'
+                : 'Reached milestone includes leads that reached this stage or a later stage.'
+            }
+          >
+            <Select
+              value={exportStageMatch}
+              disabled={exportStage === 'all'}
+              onChange={(event) =>
+                setExportStageMatch(event.target.value as ExportStageMatch)
+              }
+            >
+              <option value="current">Currently at stage</option>
+              <option value="reached">Reached milestone</option>
+            </Select>
+          </Field>
+          <div className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
+            The ZIP contains <strong>leads.csv</strong>, <strong>activities.csv</strong>,
+            and <strong>stage-history.csv</strong>.
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button
+              variant="secondary"
+              disabled={working}
+              onClick={() => setExportOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button loading={working} onClick={() => void runExport()}>
+              Download ZIP
+            </Button>
+          </div>
+        </div>
+      </Modal>
 
       <Modal
         open={formLead !== null}

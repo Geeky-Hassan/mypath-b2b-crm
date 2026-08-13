@@ -75,8 +75,12 @@ actor, stage actor, task, and target metrics without rankings.
 
 Both roles can import mapped/validated CSV using role-aware blank/example
 templates, drag-and-drop, a row report, and explicit confirmation. Lead Generator
-imports are restricted to research, qualification, and next-action fields and forced to Active
-at Lead Added; only the Founder can export. CSV remains the only spreadsheet exchange.
+imports are restricted to research, qualification, and next-action fields and forced to
+Active at Lead Added; only the Founder can export. Founder exports are asynchronous ZIP
+packages containing Excel-ready lead, activity, and stage-history CSV files. Leads-page
+exports support current filters plus exact-current-stage or reached-milestone matching;
+Bulk Import exports the same package for all leads. CSV remains the spreadsheet data
+format inside the package.
 
 The Founder creates, resets, disables, reactivates, and permanently removes Lead Generator accounts
 through a secured Supabase Edge Function. Founder-set passwords are immediately
