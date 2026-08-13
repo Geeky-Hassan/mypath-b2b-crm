@@ -15,6 +15,7 @@ import {
   Select,
 } from '../components/ui'
 import { useToast } from '../components/ui/ToastProvider'
+import { LeadExportModal } from '../components/LeadExportModal'
 import { useAsyncData } from '../hooks/useAsyncData'
 import {
   IMPORT_FIELDS,
@@ -34,7 +35,6 @@ import {
 } from '../lib/csv'
 import { findDuplicateLeads, type DuplicateCandidate } from '../lib/duplicates'
 import { dateInputValue } from '../lib/format'
-import { downloadLeadExport } from '../lib/leadExport'
 import {
   leadFormSchema,
   leadGeneratorLeadFormSchema,
@@ -42,12 +42,7 @@ import {
   type LeadFormValues,
 } from '../lib/leadValidation'
 import { phoneToParts } from '../lib/phone'
-import {
-  getAllLeads,
-  getLeadDuplicateCandidates,
-  getProfiles,
-  importLeadRows,
-} from '../services/crm'
+import { getLeadDuplicateCandidates, getProfiles, importLeadRows } from '../services/crm'
 import type { LeadInput } from '../types/domain'
 
 interface PreviewRow {
@@ -122,6 +117,7 @@ export default function ImportPage() {
   } | null>(null)
   const [includeDuplicates, setIncludeDuplicates] = useState(false)
   const [confirmOpen, setConfirmOpen] = useState(false)
+  const [exportOpen, setExportOpen] = useState(false)
   const [importing, setImporting] = useState(false)
   const [dragActive, setDragActive] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -328,29 +324,6 @@ export default function ImportPage() {
     }
   }
 
-  const exportAll = async () => {
-    setImporting(true)
-    setMessage(null)
-    try {
-      const leads = await getAllLeads()
-      if (!leads.length) throw new Error('There are no leads to export.')
-      await downloadLeadExport(leads)
-      toast({
-        title: 'Complete CRM lead export created.',
-        description: `${leads.length} leads with activities and stage history.`,
-        tone: 'success',
-      })
-    } catch (caught) {
-      setMessage({
-        tone: 'error',
-        text:
-          caught instanceof Error ? caught.message : 'The export could not be created.',
-      })
-    } finally {
-      setImporting(false)
-    }
-  }
-
   return (
     <div className="space-y-5">
       {error ? (
@@ -486,16 +459,16 @@ export default function ImportPage() {
             <Badge tone="blue">Export</Badge>
             <h2 className="mt-3 text-base font-bold text-slate-950">Export CRM leads</h2>
             <p className="mt-1.5 text-xs leading-5 text-slate-500">
-              Download all leads, activities, and stage history in one ZIP. Use Export
-              leads on the Leads page for filtered or milestone-based exports.
+              Choose all leads or narrow the ZIP by current stage or reached milestone.
+              Use Export leads on the Leads page for search, owner, country, and other
+              filters.
             </p>
             <Button
               className="mt-5"
               variant="secondary"
-              loading={importing}
-              onClick={() => void exportAll()}
+              onClick={() => setExportOpen(true)}
             >
-              Export complete lead data
+              Choose leads to export
             </Button>
           </Card>
         ) : null}
@@ -674,6 +647,8 @@ export default function ImportPage() {
           </div>
         </div>
       </Modal>
+
+      <LeadExportModal open={exportOpen} onClose={() => setExportOpen(false)} />
     </div>
   )
 }

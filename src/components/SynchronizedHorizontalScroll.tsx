@@ -7,7 +7,17 @@ import {
   type UIEvent,
 } from 'react'
 
-export function SynchronizedHorizontalScroll({ children }: { children: ReactNode }) {
+export function SynchronizedHorizontalScroll({
+  children,
+  topAriaLabel = 'Pipeline top horizontal scroll',
+  bottomAriaLabel = 'Pipeline board horizontal scroll',
+  spacerTestId = 'pipeline-scroll-spacer',
+}: {
+  children: ReactNode
+  topAriaLabel?: string
+  bottomAriaLabel?: string
+  spacerTestId?: string
+}) {
   const topRef = useRef<HTMLDivElement>(null)
   const bottomRef = useRef<HTMLDivElement>(null)
   const contentRef = useRef<HTMLDivElement>(null)
@@ -46,11 +56,11 @@ export function SynchronizedHorizontalScroll({ children }: { children: ReactNode
           ref={topRef}
           className="min-h-4 overflow-x-scroll overscroll-x-contain"
           onScroll={(event) => synchronize(event, bottomRef)}
-          aria-label="Pipeline top horizontal scroll"
+          aria-label={topAriaLabel}
           tabIndex={0}
         >
           <div
-            data-testid="pipeline-scroll-spacer"
+            data-testid={spacerTestId}
             className="h-px"
             style={{ width: `${contentWidth}px` }}
           />
@@ -60,7 +70,7 @@ export function SynchronizedHorizontalScroll({ children }: { children: ReactNode
         ref={bottomRef}
         className="overflow-x-auto overscroll-x-contain pb-5"
         onScroll={(event) => synchronize(event, topRef)}
-        aria-label="Pipeline board horizontal scroll"
+        aria-label={bottomAriaLabel}
         tabIndex={0}
       >
         <div ref={contentRef} className="w-max">

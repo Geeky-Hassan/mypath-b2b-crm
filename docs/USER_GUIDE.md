@@ -101,8 +101,9 @@ always start Active at Lead Added. Invalid rows are skipped before confirmation.
 Duplicate-warning rows are skipped unless included. A blank owner email assigns
 the importer. Founders can choose **Export leads** on the Leads page, preserve the
 current non-stage filters or start from all leads, then select an exact current stage
-or a reached milestone. **Bulk import** provides the same complete package for all
-leads. Both routes download a dated ZIP with `leads.csv`, `activities.csv`, and
+or a reached milestone. **Bulk import** opens the same stage/milestone chooser across
+all CRM leads; the download does not start until the Founder confirms the selection.
+Both routes download a dated ZIP with `leads.csv`, `activities.csv`, and
 `stage-history.csv`.
 
 The ZIP export is a working-data extract, not a complete database backup. It includes

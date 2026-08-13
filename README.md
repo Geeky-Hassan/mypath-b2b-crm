@@ -244,8 +244,9 @@ Open it in Excel and save as **CSV UTF-8** before upload. Lead Generator imports
 accept only permitted research, contact, qualification, owner, next-action, date, and notes
 fields, and always create Active records at Lead Added. Forbidden columns are
 stripped even if manually supplied. Filtered, milestone, and full rich export remains
-Founder-only. The ZIP includes current lead data, all activities for the selected leads,
-and their complete recorded stage history.
+Founder-only, and every export requires confirmation in a selection dialog. The ZIP
+includes current lead data, all activities for the selected leads, and their complete
+recorded stage history.
 CSV is the only spreadsheet exchange in V1—there is no native `.xlsx` parsing or
 live Excel synchronization.
 

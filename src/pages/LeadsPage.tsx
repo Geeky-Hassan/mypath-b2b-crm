@@ -22,15 +22,12 @@ import {
 } from '../components/ui'
 import { useToast } from '../components/ui/ToastProvider'
 import { LeadReadinessBadge } from '../components/LeadReadinessBadge'
+import { LeadExportModal } from '../components/LeadExportModal'
+import { SynchronizedHorizontalScroll } from '../components/SynchronizedHorizontalScroll'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { friendlyLeadSaveError, logCrmError } from '../lib/crmErrors'
 import { findDuplicateLeads, type DuplicateMatch } from '../lib/duplicates'
 import { formatDate, formatDateTime, formatMoney, stageLabel } from '../lib/format'
-import {
-  downloadLeadExport,
-  filterLeadsForExport,
-  type ExportStageMatch,
-} from '../lib/leadExport'
 import {
   leadFormSchema,
   leadGeneratorLeadFormSchema,
@@ -43,7 +40,6 @@ import {
   DEFAULT_LEAD_FILTERS,
   addActivity,
   deleteActivity,
-  getAllLeads,
   getLeadDuplicateCandidates,
   getLeadsPage,
   getProfiles,
@@ -64,7 +60,6 @@ import {
   type ActivityType,
   type LeadFilters,
   type LeadRecord,
-  type PipelineStage,
   type Profile,
 } from '../types/domain'
 
@@ -77,7 +72,6 @@ const activitySchema = z.object({
 
 type ActivityValues = z.infer<typeof activitySchema>
 type LeadDetailTab = 'overview' | 'activity' | 'history'
-type LeadExportScope = 'filtered' | 'all'
 
 function toneForStage(stage: LeadRecord['current_pipeline_stage']) {
   if (stage === 'paid_pilot_won' || stage === 'recurring_contract_won') {
@@ -951,10 +945,6 @@ export default function LeadsPage() {
   const [formLead, setFormLead] = useState<LeadRecord | null | 'new'>(null)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [exportOpen, setExportOpen] = useState(false)
-  const [exportScope, setExportScope] = useState<LeadExportScope>('filtered')
-  const [exportStage, setExportStage] = useState<PipelineStage | 'all'>('all')
-  const [exportStageMatch, setExportStageMatch] = useState<ExportStageMatch>('current')
-  const [exportError, setExportError] = useState<string | null>(null)
   const [deleteLead, setDeleteLead] = useState<LeadRecord | null>(null)
   const [deleteConfirmation, setDeleteConfirmation] = useState('')
   const [preparedForDeletion, setPreparedForDeletion] = useState(false)
@@ -1099,49 +1089,6 @@ export default function LeadsPage() {
     }
   }
 
-  const openExport = () => {
-    setActionError(null)
-    setExportError(null)
-    setExportScope('filtered')
-    setExportStage(filters.stage)
-    setExportStageMatch('current')
-    setExportOpen(true)
-  }
-
-  const runExport = async () => {
-    setWorking(true)
-    setExportError(null)
-    try {
-      const exportFilters =
-        exportScope === 'filtered'
-          ? { ...filters, stage: 'all' as const, page: 1 }
-          : { ...DEFAULT_LEAD_FILTERS, stage: 'all' as const, page: 1 }
-      const candidates = await getAllLeads(exportFilters)
-      const leads = filterLeadsForExport(candidates, {
-        stage: exportStage,
-        stageMatch: exportStageMatch,
-      })
-      if (!leads.length) {
-        throw new Error(
-          'No leads match these export options. Adjust the filters and try again.',
-        )
-      }
-      await downloadLeadExport(leads)
-      setExportOpen(false)
-      toast({
-        title: 'Complete lead export created.',
-        description: `${leads.length} leads with activities and stage history.`,
-        tone: 'success',
-      })
-    } catch (caught) {
-      setExportError(
-        caught instanceof Error ? caught.message : 'The export could not be created.',
-      )
-    } finally {
-      setWorking(false)
-    }
-  }
-
   if (loading && !data) return <PageLoader label="Loading leads…" />
 
   return (
@@ -1153,7 +1100,7 @@ export default function LeadsPage() {
         action={
           <div className="flex gap-2">
             {isFounder ? (
-              <Button variant="secondary" onClick={openExport} loading={working}>
+              <Button variant="secondary" onClick={() => setExportOpen(true)}>
                 Export leads
               </Button>
             ) : null}
@@ -1329,108 +1276,120 @@ export default function LeadsPage() {
           action={<Button onClick={() => setFormLead('new')}>Add lead</Button>}
         />
       ) : (
-        <DataTable>
-          <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
-            <tr>
-              <th className="px-4 py-3">Company</th>
-              <th className="px-4 py-3">Contact</th>
-              <th className="px-4 py-3">Stage</th>
-              <th className="px-4 py-3">Owner</th>
-              <th className="px-4 py-3">Priority</th>
-              <th className="px-4 py-3">Founder readiness</th>
-              <th className="px-4 py-3">Next action</th>
-              {isFounder ? <th className="px-4 py-3">Value</th> : null}
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {data.page.leads.map((lead) => (
-              <tr key={lead.id} className="hover:bg-slate-50/70">
-                <td className="px-4 py-3">
-                  <p className="font-semibold text-slate-900">{lead.company_name}</p>
-                  <p className="mt-0.5 text-xs text-slate-400">
-                    {lead.country || lead.website || 'No market detail'}
-                  </p>
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  <p>{lead.contact_name || '—'}</p>
-                  <p className="text-xs text-slate-400">{lead.email}</p>
-                </td>
-                <td className="px-4 py-3">
-                  <Badge tone={toneForStage(lead.current_pipeline_stage)}>
-                    {stageLabel(lead.current_pipeline_stage)}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  {lead.owner?.full_name ?? '—'}
-                </td>
-                <td className="px-4 py-3">
-                  <Badge
-                    tone={
-                      lead.priority === 'high'
-                        ? 'red'
-                        : lead.priority === 'medium'
-                          ? 'amber'
-                          : 'slate'
-                    }
-                  >
-                    {lead.priority}
-                  </Badge>
-                </td>
-                <td className="px-4 py-3">
-                  <LeadReadinessBadge lead={lead} />
-                </td>
-                <td className="px-4 py-3 text-slate-600">
-                  <p>{lead.next_action || '—'}</p>
-                  <p className="text-xs text-slate-400">
-                    {formatDate(lead.next_action_date)}
-                  </p>
-                </td>
-                {isFounder ? (
-                  <td className="px-4 py-3 font-medium text-slate-700">
-                    {formatMoney(lead.proposed_value, data.settings.default_currency)}
-                  </td>
-                ) : null}
-                <td className="px-4 py-3">
-                  <div className="flex justify-end gap-2">
-                    <Button
-                      size="sm"
-                      variant="secondary"
-                      onClick={() => setSelectedId(lead.id)}
-                    >
-                      View details
-                    </Button>
-                    <Button size="sm" variant="ghost" onClick={() => setFormLead(lead)}>
-                      Edit
-                    </Button>
-                    {isFounder ? (
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        loading={working}
-                        onClick={() => void archive(lead)}
+        <SynchronizedHorizontalScroll
+          topAriaLabel="Leads table top horizontal scroll"
+          bottomAriaLabel="Leads table horizontal scroll"
+          spacerTestId="leads-scroll-spacer"
+        >
+          <div className="w-full min-w-[1180px]">
+            <DataTable>
+              <thead className="bg-slate-50 text-xs uppercase tracking-wide text-slate-500">
+                <tr>
+                  <th className="px-4 py-3">Company</th>
+                  <th className="px-4 py-3">Contact</th>
+                  <th className="px-4 py-3">Stage</th>
+                  <th className="px-4 py-3">Owner</th>
+                  <th className="px-4 py-3">Priority</th>
+                  <th className="px-4 py-3">Founder readiness</th>
+                  <th className="px-4 py-3">Next action</th>
+                  {isFounder ? <th className="px-4 py-3">Value</th> : null}
+                  <th className="px-4 py-3 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                {data.page.leads.map((lead) => (
+                  <tr key={lead.id} className="hover:bg-slate-50/70">
+                    <td className="px-4 py-3">
+                      <p className="font-semibold text-slate-900">{lead.company_name}</p>
+                      <p className="mt-0.5 text-xs text-slate-400">
+                        {lead.country || lead.website || 'No market detail'}
+                      </p>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <p>{lead.contact_name || '—'}</p>
+                      <p className="text-xs text-slate-400">{lead.email}</p>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge tone={toneForStage(lead.current_pipeline_stage)}>
+                        {stageLabel(lead.current_pipeline_stage)}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      {lead.owner?.full_name ?? '—'}
+                    </td>
+                    <td className="px-4 py-3">
+                      <Badge
+                        tone={
+                          lead.priority === 'high'
+                            ? 'red'
+                            : lead.priority === 'medium'
+                              ? 'amber'
+                              : 'slate'
+                        }
                       >
-                        {lead.lifecycle_status === 'archived' ? 'Restore' : 'Archive'}
-                      </Button>
+                        {lead.priority}
+                      </Badge>
+                    </td>
+                    <td className="px-4 py-3">
+                      <LeadReadinessBadge lead={lead} />
+                    </td>
+                    <td className="px-4 py-3 text-slate-600">
+                      <p>{lead.next_action || '—'}</p>
+                      <p className="text-xs text-slate-400">
+                        {formatDate(lead.next_action_date)}
+                      </p>
+                    </td>
+                    {isFounder ? (
+                      <td className="px-4 py-3 font-medium text-slate-700">
+                        {formatMoney(lead.proposed_value, data.settings.default_currency)}
+                      </td>
                     ) : null}
-                    <Button
-                      size="sm"
-                      variant="danger"
-                      onClick={() => {
-                        setDeleteLead(lead)
-                        setDeleteConfirmation('')
-                        setPreparedForDeletion(false)
-                        setActionError(null)
-                      }}
-                    >
-                      Delete...
-                    </Button>
-                  </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </DataTable>
+                    <td className="px-4 py-3">
+                      <div className="flex justify-end gap-2">
+                        <Button
+                          size="sm"
+                          variant="secondary"
+                          onClick={() => setSelectedId(lead.id)}
+                        >
+                          View details
+                        </Button>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => setFormLead(lead)}
+                        >
+                          Edit
+                        </Button>
+                        {isFounder ? (
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            loading={working}
+                            onClick={() => void archive(lead)}
+                          >
+                            {lead.lifecycle_status === 'archived' ? 'Restore' : 'Archive'}
+                          </Button>
+                        ) : null}
+                        <Button
+                          size="sm"
+                          variant="danger"
+                          onClick={() => {
+                            setDeleteLead(lead)
+                            setDeleteConfirmation('')
+                            setPreparedForDeletion(false)
+                            setActionError(null)
+                          }}
+                        >
+                          Delete...
+                        </Button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </DataTable>
+          </div>
+        </SynchronizedHorizontalScroll>
       )}
 
       <div className="flex items-center justify-between text-sm text-slate-500">
@@ -1458,83 +1417,11 @@ export default function LeadsPage() {
         </div>
       </div>
 
-      <Modal
+      <LeadExportModal
         open={exportOpen}
-        onClose={() => {
-          if (working) return
-          setExportOpen(false)
-          setExportError(null)
-        }}
-        title="Export leads"
-        description="Download lead details, activity updates, and stage history in one ZIP."
-        size="md"
-      >
-        <div className="space-y-4">
-          {exportError ? <Alert tone="error">{exportError}</Alert> : null}
-          <Field
-            label="Lead scope"
-            hint="Current filters include search, lifecycle, owner, country, segment, source, readiness, priority, and sorting."
-          >
-            <Select
-              value={exportScope}
-              onChange={(event) => setExportScope(event.target.value as LeadExportScope)}
-            >
-              <option value="filtered">Use current Leads-page filters</option>
-              <option value="all">All CRM leads</option>
-            </Select>
-          </Field>
-          <Field label="Pipeline stage">
-            <Select
-              value={exportStage}
-              onChange={(event) =>
-                setExportStage(event.target.value as PipelineStage | 'all')
-              }
-            >
-              <option value="all">All stages</option>
-              {PIPELINE_STAGES.map((stage) => (
-                <option key={stage} value={stage}>
-                  {stageLabel(stage)}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field
-            label="Stage match"
-            hint={
-              exportStage === 'all'
-                ? 'Choose a pipeline stage to use stage matching.'
-                : 'Reached milestone includes leads that reached this stage or a later stage.'
-            }
-          >
-            <Select
-              value={exportStageMatch}
-              disabled={exportStage === 'all'}
-              onChange={(event) =>
-                setExportStageMatch(event.target.value as ExportStageMatch)
-              }
-            >
-              <option value="current">Currently at stage</option>
-              <option value="reached">Reached milestone</option>
-            </Select>
-          </Field>
-          <div className="rounded-lg bg-slate-50 p-3 text-xs leading-5 text-slate-600">
-            The ZIP contains <strong>leads.csv</strong>, <strong>activities.csv</strong>,
-            and <strong>stage-history.csv</strong>.
-          </div>
-          <div className="flex justify-end gap-3">
-            <Button
-              variant="secondary"
-              disabled={working}
-              onClick={() => setExportOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button loading={working} onClick={() => void runExport()}>
-              Download ZIP
-            </Button>
-          </div>
-        </div>
-      </Modal>
+        onClose={() => setExportOpen(false)}
+        currentFilters={filters}
+      />
 
       <Modal
         open={formLead !== null}

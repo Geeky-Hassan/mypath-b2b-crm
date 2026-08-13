@@ -30,4 +30,20 @@ describe('SynchronizedHorizontalScroll', () => {
     fireEvent.scroll(top)
     expect(bottom.scrollLeft).toBe(1600)
   })
+
+  it('supports screen-specific labels and spacer identifiers', () => {
+    render(
+      <SynchronizedHorizontalScroll
+        topAriaLabel="Leads table top horizontal scroll"
+        bottomAriaLabel="Leads table horizontal scroll"
+        spacerTestId="leads-scroll-spacer"
+      >
+        <div>Lead rows</div>
+      </SynchronizedHorizontalScroll>,
+    )
+
+    expect(screen.getByLabelText('Leads table top horizontal scroll')).toBeTruthy()
+    expect(screen.getByLabelText('Leads table horizontal scroll')).toBeTruthy()
+    expect(screen.getByTestId('leads-scroll-spacer')).toBeTruthy()
+  })
 })

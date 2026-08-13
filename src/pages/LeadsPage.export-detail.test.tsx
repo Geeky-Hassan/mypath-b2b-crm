@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { cleanup, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -251,6 +251,11 @@ describe('Leads page export and row actions', () => {
 
     expect(screen.getByText('Blue Orange Wave', { selector: 'p' })).toBeTruthy()
     expect(screen.queryByRole('button', { name: 'Blue Orange Wave' })).toBeNull()
+    const topScroll = screen.getByLabelText('Leads table top horizontal scroll')
+    const tableScroll = screen.getByLabelText('Leads table horizontal scroll')
+    topScroll.scrollLeft = 500
+    fireEvent.scroll(topScroll)
+    expect(tableScroll.scrollLeft).toBe(500)
     await user.click(screen.getByRole('button', { name: 'View details' }))
 
     expect(await screen.findByRole('heading', { name: 'Blue Orange Wave' })).toBeTruthy()

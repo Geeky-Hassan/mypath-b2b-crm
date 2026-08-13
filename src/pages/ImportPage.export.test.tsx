@@ -45,10 +45,16 @@ afterEach(cleanup)
 beforeEach(() => {
   importMocks.getAllLeads.mockReset().mockResolvedValue([exportLead])
   importMocks.downloadLeadExport.mockReset().mockResolvedValue(undefined)
+  HTMLDialogElement.prototype.showModal = function showModal() {
+    this.setAttribute('open', '')
+  }
+  HTMLDialogElement.prototype.close = function close() {
+    this.removeAttribute('open')
+  }
 })
 
 describe('Bulk Import rich export', () => {
-  it('sends every lead through the shared rich ZIP downloader', async () => {
+  it('opens a selection modal before sending matching leads to the ZIP downloader', async () => {
     const user = userEvent.setup()
     render(
       <ToastProvider>
@@ -56,10 +62,22 @@ describe('Bulk Import rich export', () => {
       </ToastProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Export complete lead data' }))
+    await user.click(screen.getByRole('button', { name: 'Choose leads to export' }))
 
-    await waitFor(() => expect(importMocks.getAllLeads).toHaveBeenCalledWith())
-    expect(importMocks.downloadLeadExport).toHaveBeenCalledWith([exportLead])
+    expect(screen.getByRole('heading', { name: 'Choose leads to export' })).toBeTruthy()
+    await user.selectOptions(screen.getByLabelText('Pipeline stage'), 'qualified')
+    importMocks.getAllLeads.mockResolvedValue([
+      { ...exportLead, current_pipeline_stage: 'qualified' },
+    ])
+    await user.click(screen.getByRole('button', { name: 'Download ZIP' }))
+
+    await waitFor(() => expect(importMocks.getAllLeads).toHaveBeenCalledTimes(1))
+    expect(importMocks.getAllLeads).toHaveBeenCalledWith(
+      expect.objectContaining({ stage: 'all', page: 1 }),
+    )
+    expect(importMocks.downloadLeadExport).toHaveBeenCalledWith([
+      { ...exportLead, current_pipeline_stage: 'qualified' },
+    ])
   })
 
   it('does not download when there are no leads', async () => {
@@ -71,9 +89,10 @@ describe('Bulk Import rich export', () => {
       </ToastProvider>,
     )
 
-    await user.click(screen.getByRole('button', { name: 'Export complete lead data' }))
+    await user.click(screen.getByRole('button', { name: 'Choose leads to export' }))
+    await user.click(screen.getByRole('button', { name: 'Download ZIP' }))
 
-    expect(await screen.findByText('There are no leads to export.')).toBeTruthy()
+    expect(await screen.findByText(/No leads match these export options/i)).toBeTruthy()
     expect(importMocks.downloadLeadExport).not.toHaveBeenCalled()
   })
 })

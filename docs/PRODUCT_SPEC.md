@@ -79,8 +79,8 @@ imports are restricted to research, qualification, and next-action fields and fo
 Active at Lead Added; only the Founder can export. Founder exports are asynchronous ZIP
 packages containing Excel-ready lead, activity, and stage-history CSV files. Leads-page
 exports support current filters plus exact-current-stage or reached-milestone matching;
-Bulk Import exports the same package for all leads. CSV remains the spreadsheet data
-format inside the package.
+Bulk Import opens the same stage/milestone chooser across all CRM leads before any
+download starts. CSV remains the spreadsheet data format inside the package.
 
 The Founder creates, resets, disables, reactivates, and permanently removes Lead Generator accounts
 through a secured Supabase Edge Function. Founder-set passwords are immediately
