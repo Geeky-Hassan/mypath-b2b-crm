@@ -8,6 +8,7 @@ import LoginPage, { friendlyAuthError } from './LoginPage'
 
 const authState = vi.hoisted(() => ({
   user: null as { id: string } | null,
+  sessionInterrupted: false,
   signIn: vi.fn(),
 }))
 
@@ -18,6 +19,7 @@ afterEach(cleanup)
 describe('login form', () => {
   beforeEach(() => {
     authState.user = null
+    authState.sessionInterrupted = false
     authState.signIn.mockReset()
   })
 
@@ -71,5 +73,17 @@ describe('login form', () => {
     expect(friendlyAuthError(new Error('Email not confirmed'))).toBe(
       'This email is not confirmed. Ask the Founder to reset the login password or reactivate access.',
     )
+  })
+
+  it('explains an unexpected session interruption', () => {
+    authState.sessionInterrupted = true
+    render(
+      <MemoryRouter>
+        <LoginPage returnTo="/leads" />
+      </MemoryRouter>,
+    )
+
+    expect(screen.getByText('Your session ended')).toBeTruthy()
+    expect(screen.getByText(/return you to the page you were using/i)).toBeTruthy()
   })
 })

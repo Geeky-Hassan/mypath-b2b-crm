@@ -39,7 +39,7 @@ function safeReturnTo(returnTo?: string): string {
 }
 
 export default function LoginPage({ returnTo }: { returnTo?: string }) {
-  const { user, signIn } = useAuth()
+  const { user, signIn, sessionInterrupted } = useAuth()
   const [error, setError] = useState<string | null>(null)
   const {
     register,
@@ -104,6 +104,12 @@ export default function LoginPage({ returnTo }: { returnTo?: string }) {
           </p>
 
           <form className="mt-6 space-y-4" onSubmit={submit} noValidate>
+            {sessionInterrupted ? (
+              <Alert tone="warning" title="Your session ended">
+                Sign in again to continue. The CRM will return you to the page you were
+                using.
+              </Alert>
+            ) : null}
             {error ? <Alert tone="error">{error}</Alert> : null}
             <Field label="Email" error={errors.email?.message} required>
               <Input type="email" autoComplete="email" {...register('email')} />

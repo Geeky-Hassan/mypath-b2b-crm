@@ -24,6 +24,7 @@ import { useToast } from '../components/ui/ToastProvider'
 import { LeadReadinessBadge } from '../components/LeadReadinessBadge'
 import { useAsyncData } from '../hooks/useAsyncData'
 import { downloadText, leadsToExportCsv } from '../lib/csv'
+import { friendlyLeadSaveError, logCrmError } from '../lib/crmErrors'
 import { findDuplicateLeads, type DuplicateMatch } from '../lib/duplicates'
 import {
   dateInputValue,
@@ -162,7 +163,8 @@ export function LeadForm({
       })
       await onSaved()
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The lead could not be saved.')
+      logCrmError('Lead form persistence', caught)
+      setError(friendlyLeadSaveError(caught))
     }
   }
 

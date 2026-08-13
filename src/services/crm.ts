@@ -1,8 +1,10 @@
 import { getSupabase } from '../lib/supabase'
+import { toSupabaseRequestError, withSessionRecovery } from '../auth/sessionRecovery'
 import {
   READY_FOR_FOUNDER_COLUMNS,
   READY_FOR_FOUNDER_TEXT_COLUMNS,
 } from '../lib/leadReadiness'
+import { CrmAccessUnavailableError } from '../lib/crmErrors'
 import { TARGET_TYPES } from '../types/domain'
 import type {
   ActivityType,
@@ -210,12 +212,15 @@ export async function getLeadDuplicateCandidates(): Promise<
     []
   let offset = 0
   while (true) {
-    const { data, error } = await getSupabase()
-      .from('crm_leads')
-      .select('id, company_name, website, email')
-      .order('id')
-      .range(offset, offset + pageSize - 1)
-    if (error) throw error
+    const { data } = await withSessionRecovery(async () => {
+      const result = await getSupabase()
+        .from('crm_leads')
+        .select('id, company_name, website, email')
+        .order('id')
+        .range(offset, offset + pageSize - 1)
+      if (result.error) throw toSupabaseRequestError(result.error, result.status)
+      return result
+    })
     const page = (data ?? []) as Array<
       Pick<LeadRecord, 'id' | 'company_name' | 'website' | 'email'>
     >
@@ -235,22 +240,28 @@ export async function saveLead(
   const payload = leadPayload(input, isFounder)
 
   if (leadId) {
-    const { error, count } = await getSupabase()
-      .from('leads')
-      .update(payload, { count: 'exact' })
-      .eq('id', leadId)
-    if (error) throw error
-    if (count !== 1) throw new Error('The lead was not updated. Refresh and try again.')
-    return leadId
+    return withSessionRecovery(async () => {
+      const result = await getSupabase()
+        .from('leads')
+        .update(payload, { count: 'exact' })
+        .eq('id', leadId)
+      if (result.error) throw toSupabaseRequestError(result.error, result.status)
+      if (result.count !== 1) {
+        throw new CrmAccessUnavailableError()
+      }
+      return leadId
+    })
   }
 
-  const { data, error } = await getSupabase()
-    .from('leads')
-    .insert({ ...payload, created_by: currentUserId })
-    .select('id')
-    .single()
-  if (error) throw error
-  return (data as { id: string }).id
+  return withSessionRecovery(async () => {
+    const result = await getSupabase()
+      .from('leads')
+      .insert({ ...payload, created_by: currentUserId })
+      .select('id')
+      .single()
+    if (result.error) throw toSupabaseRequestError(result.error, result.status)
+    return (result.data as { id: string }).id
+  })
 }
 
 export async function addActivity(

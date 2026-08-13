@@ -18,6 +18,7 @@ interface AuthContextValue {
   profile: Profile | null
   loading: boolean
   error: string | null
+  sessionInterrupted: boolean
   signIn: (email: string, password: string) => Promise<void>
   signOut: () => Promise<void>
   reloadProfile: () => Promise<void>
@@ -40,10 +41,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [sessionInterrupted, setSessionInterrupted] = useState(false)
   const profileRequest = useRef(0)
   const mountedRef = useRef(true)
   const sessionRef = useRef<Session | null>(null)
   const profileRef = useRef<Profile | null>(null)
+  const hadAuthenticatedSessionRef = useRef(false)
+  const deliberateSignOutRef = useRef(false)
 
   const loadProfile = useCallback(async (userId: string, blocking: boolean) => {
     const requestId = ++profileRequest.current
@@ -79,11 +83,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const previousUserId = sessionRef.current?.user.id ?? null
       const nextUserId = nextSession?.user.id ?? null
       const userChanged = previousUserId !== nextUserId
+      const hadAuthenticatedSession = hadAuthenticatedSessionRef.current
 
       sessionRef.current = nextSession
       setSession(nextSession)
 
       if (!nextSession?.user) {
+        hadAuthenticatedSessionRef.current = false
+        if (hadAuthenticatedSession && !deliberateSignOutRef.current) {
+          setSessionInterrupted(true)
+        }
         profileRequest.current += 1
         profileRef.current = null
         setProfile(null)
@@ -92,6 +101,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         return
       }
 
+      hadAuthenticatedSessionRef.current = true
+      setSessionInterrupted(false)
       const userId = nextSession.user.id
       if (event === 'TOKEN_REFRESHED') return
 
@@ -136,6 +147,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       profile,
       loading,
       error,
+      sessionInterrupted,
       signIn: async (email, password) => {
         const { data, error: signInError } = await getSupabase().auth.signInWithPassword({
           email,
@@ -147,16 +159,21 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         }
       },
       signOut: async () => {
-        const { error: signOutError } = await getSupabase().auth.signOut()
-        if (signOutError) throw signOutError
-        acceptSession('SIGNED_OUT', null)
+        deliberateSignOutRef.current = true
+        try {
+          const { error: signOutError } = await getSupabase().auth.signOut()
+          if (signOutError) throw signOutError
+          if (sessionRef.current) acceptSession('SIGNED_OUT', null)
+        } finally {
+          deliberateSignOutRef.current = false
+        }
       },
       reloadProfile: async () => {
         if (!session?.user) return
         await loadProfile(session.user.id, !profileRef.current)
       },
     }),
-    [session, profile, loading, error, acceptSession, loadProfile],
+    [session, profile, loading, error, sessionInterrupted, acceptSession, loadProfile],
   )
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>

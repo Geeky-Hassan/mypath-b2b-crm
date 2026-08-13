@@ -123,4 +123,47 @@ describe('lead form', () => {
     expect(screen.queryByLabelText(/Proposed value/i)).toBeNull()
     expect(screen.queryByLabelText(/Lifecycle status/i)).toBeNull()
   })
+
+  it('keeps entered values in the form after a network save failure', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    crmMocks.saveLead.mockRejectedValue(new TypeError('Failed to fetch'))
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText(/^Company name/), 'Unsaved Northstar')
+    await user.type(screen.getByLabelText(/^Website/), 'https://northstar.example')
+    await user.click(screen.getByRole('button', { name: 'Add lead' }))
+
+    expect(await screen.findByText(/Your changes are still in this form/i)).toBeTruthy()
+    expect((screen.getByLabelText(/^Company name/) as HTMLInputElement).value).toBe(
+      'Unsaved Northstar',
+    )
+    expect((screen.getByLabelText(/^Website/) as HTMLInputElement).value).toBe(
+      'https://northstar.example',
+    )
+    expect(crmMocks.saveLead).toHaveBeenCalledTimes(1)
+    consoleError.mockRestore()
+  })
+
+  it('turns structured access errors into a safe actionable message', async () => {
+    const consoleError = vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    crmMocks.saveLead.mockRejectedValue({
+      code: '42501',
+      status: 403,
+      message: 'new row violates row-level security policy',
+    })
+    const user = userEvent.setup()
+    renderForm()
+
+    await user.type(screen.getByLabelText(/^Company name/), 'Access Check')
+    await user.click(screen.getByRole('button', { name: 'Add lead' }))
+
+    expect(
+      await screen.findByText(/Ask the Founder to check Users & access/i),
+    ).toBeTruthy()
+    expect((screen.getByLabelText(/^Company name/) as HTMLInputElement).value).toBe(
+      'Access Check',
+    )
+    consoleError.mockRestore()
+  })
 })

@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 
-import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { AuthChangeEvent, Session } from '@supabase/supabase-js'
-import { AuthProvider } from './AuthContext'
+import { AuthProvider, useAuth } from './AuthContext'
 import { ProtectedRoute } from './RouteGuards'
+
+afterEach(cleanup)
 
 const mocks = vi.hoisted(() => ({
   authCallback: null as
@@ -108,5 +110,60 @@ describe('AuthProvider session stability', () => {
     )
     expect(mocks.single).toHaveBeenCalledTimes(1)
     expect(screen.queryByText('Opening your CRM…')).toBeNull()
+  })
+  it('marks an unexpected session termination and clears it after sign-in', async () => {
+    function AuthStatus() {
+      const { user, sessionInterrupted } = useAuth()
+      return (
+        <p>
+          {user ? 'signed-in' : 'signed-out'} /{' '}
+          {sessionInterrupted ? 'interrupted' : 'not-interrupted'}
+        </p>
+      )
+    }
+
+    render(
+      <AuthProvider>
+        <AuthStatus />
+      </AuthProvider>,
+    )
+
+    act(() => mocks.authCallback?.('INITIAL_SESSION', session('initial-token')))
+    await screen.findByText('signed-in / not-interrupted')
+
+    act(() => mocks.authCallback?.('SIGNED_OUT', null))
+    expect(screen.getByText('signed-out / interrupted')).toBeTruthy()
+
+    act(() => mocks.authCallback?.('SIGNED_IN', session('new-token')))
+    expect(screen.getByText('signed-in / not-interrupted')).toBeTruthy()
+  })
+
+  it('does not mark a deliberate sign-out as an interruption', async () => {
+    function SignOutControl() {
+      const { user, sessionInterrupted, signOut } = useAuth()
+      return (
+        <div>
+          <p>
+            {user ? 'signed-in' : 'signed-out'} /{' '}
+            {sessionInterrupted ? 'interrupted' : 'not-interrupted'}
+          </p>
+          <button type="button" onClick={() => void signOut()}>
+            Sign out now
+          </button>
+        </div>
+      )
+    }
+
+    render(
+      <AuthProvider>
+        <SignOutControl />
+      </AuthProvider>,
+    )
+
+    act(() => mocks.authCallback?.('INITIAL_SESSION', session('initial-token')))
+    await screen.findByText('signed-in / not-interrupted')
+    fireEvent.click(screen.getByRole('button', { name: 'Sign out now' }))
+
+    await screen.findByText('signed-out / not-interrupted')
   })
 })

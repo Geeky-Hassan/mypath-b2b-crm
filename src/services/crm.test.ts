@@ -14,10 +14,20 @@ const supabaseMocks = vi.hoisted(() => ({
   neq: vi.fn(),
   order: vi.fn(),
   range: vi.fn(),
+  single: vi.fn(),
+  getSession: vi.fn(),
+  refreshSession: vi.fn(),
 }))
 
 vi.mock('../lib/supabase', () => ({
-  getSupabase: () => ({ from: supabaseMocks.from, rpc: supabaseMocks.rpc }),
+  getSupabase: () => ({
+    from: supabaseMocks.from,
+    rpc: supabaseMocks.rpc,
+    auth: {
+      getSession: supabaseMocks.getSession,
+      refreshSession: supabaseMocks.refreshSession,
+    },
+  }),
 }))
 
 import {
@@ -27,6 +37,7 @@ import {
   importLeadRows,
   moveLeadStage,
   permanentlyDeleteLead,
+  saveLead,
   setLeadArchived,
 } from './crm'
 
@@ -41,6 +52,104 @@ const lead: LeadInput = {
   lifecycle_status: 'active',
   date_added: '2026-08-03',
 }
+
+function activeSession() {
+  return {
+    access_token: 'access-token',
+    refresh_token: 'refresh-token',
+    expires_at: Math.floor(Date.now() / 1000) + 3600,
+    user: { id: 'user-1' },
+  }
+}
+
+describe('lead save session recovery', () => {
+  beforeEach(() => {
+    supabaseMocks.from.mockReset()
+    supabaseMocks.insert.mockReset()
+    supabaseMocks.update.mockReset()
+    supabaseMocks.eq.mockReset()
+    supabaseMocks.select.mockReset()
+    supabaseMocks.single.mockReset()
+    supabaseMocks.getSession.mockReset().mockResolvedValue({
+      data: { session: activeSession() },
+      error: null,
+    })
+    supabaseMocks.refreshSession.mockReset().mockResolvedValue({
+      data: { session: activeSession() },
+      error: null,
+    })
+  })
+
+  it('retries an unauthenticated create once with the identical payload', async () => {
+    supabaseMocks.from.mockReturnValue({ insert: supabaseMocks.insert })
+    supabaseMocks.insert.mockReturnValue({ select: supabaseMocks.select })
+    supabaseMocks.select.mockReturnValue({ single: supabaseMocks.single })
+    supabaseMocks.single
+      .mockResolvedValueOnce({
+        data: null,
+        error: { code: 'PGRST301', message: 'JWT expired' },
+        status: 401,
+      })
+      .mockResolvedValueOnce({
+        data: { id: 'lead-1' },
+        error: null,
+        status: 201,
+      })
+
+    await expect(saveLead(lead, 'user-1')).resolves.toBe('lead-1')
+
+    expect(supabaseMocks.insert).toHaveBeenCalledTimes(2)
+    expect(supabaseMocks.insert.mock.calls[0]?.[0]).toEqual(
+      supabaseMocks.insert.mock.calls[1]?.[0],
+    )
+    expect(supabaseMocks.refreshSession).toHaveBeenCalledTimes(1)
+  })
+
+  it.each([
+    ['network', { message: 'Failed to fetch' }, 0],
+    ['permission', { code: '42501', message: 'Forbidden' }, 403],
+  ])('does not retry a create after a %s error', async (_label, error, status) => {
+    supabaseMocks.from.mockReturnValue({ insert: supabaseMocks.insert })
+    supabaseMocks.insert.mockReturnValue({ select: supabaseMocks.select })
+    supabaseMocks.select.mockReturnValue({ single: supabaseMocks.single })
+    supabaseMocks.single.mockResolvedValue({ data: null, error, status })
+
+    await expect(saveLead(lead, 'user-1')).rejects.toMatchObject({ status })
+    expect(supabaseMocks.insert).toHaveBeenCalledTimes(1)
+    expect(supabaseMocks.refreshSession).not.toHaveBeenCalled()
+  })
+
+  it('retries an unauthenticated update once and requires one changed row', async () => {
+    supabaseMocks.from.mockReturnValue({ update: supabaseMocks.update })
+    supabaseMocks.update.mockReturnValue({ eq: supabaseMocks.eq })
+    supabaseMocks.eq
+      .mockResolvedValueOnce({
+        error: { code: 'PGRST301', message: 'JWT expired' },
+        status: 401,
+        count: null,
+      })
+      .mockResolvedValueOnce({ error: null, status: 204, count: 1 })
+
+    await expect(saveLead(lead, 'user-1', 'lead-1')).resolves.toBe('lead-1')
+    expect(supabaseMocks.update).toHaveBeenCalledTimes(2)
+    expect(supabaseMocks.update.mock.calls[0]?.[0]).toEqual(
+      supabaseMocks.update.mock.calls[1]?.[0],
+    )
+    expect(supabaseMocks.refreshSession).toHaveBeenCalledTimes(1)
+  })
+
+  it('treats a zero-row update as unavailable access without retrying it', async () => {
+    supabaseMocks.from.mockReturnValue({ update: supabaseMocks.update })
+    supabaseMocks.update.mockReturnValue({ eq: supabaseMocks.eq })
+    supabaseMocks.eq.mockResolvedValue({ error: null, status: 204, count: 0 })
+
+    await expect(saveLead(lead, 'user-1', 'lead-1')).rejects.toMatchObject({
+      name: 'CrmAccessUnavailableError',
+    })
+    expect(supabaseMocks.update).toHaveBeenCalledTimes(1)
+    expect(supabaseMocks.refreshSession).not.toHaveBeenCalled()
+  })
+})
 
 describe('transactional CSV persistence', () => {
   beforeEach(() => {
